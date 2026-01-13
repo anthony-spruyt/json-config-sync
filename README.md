@@ -2,6 +2,8 @@
 
 [![CI](https://github.com/anthony-spruyt/json-config-sync/actions/workflows/ci.yml/badge.svg)](https://github.com/anthony-spruyt/json-config-sync/actions/workflows/ci.yml)
 [![Integration Test](https://github.com/anthony-spruyt/json-config-sync/actions/workflows/integration.yml/badge.svg)](https://github.com/anthony-spruyt/json-config-sync/actions/workflows/integration.yml)
+[![npm version](https://img.shields.io/npm/v/@aspruyt/json-config-sync.svg)](https://www.npmjs.com/package/@aspruyt/json-config-sync)
+[![npm downloads](https://img.shields.io/npm/dw/@aspruyt/json-config-sync.svg)](https://www.npmjs.com/package/@aspruyt/json-config-sync)
 
 A CLI tool that syncs JSON configuration files across multiple Git repositories by creating pull requests.
 
