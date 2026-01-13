@@ -5,7 +5,7 @@
 [![npm version](https://img.shields.io/npm/v/@aspruyt/json-config-sync.svg)](https://www.npmjs.com/package/@aspruyt/json-config-sync)
 [![npm downloads](https://img.shields.io/npm/dw/@aspruyt/json-config-sync.svg)](https://www.npmjs.com/package/@aspruyt/json-config-sync)
 
-A CLI tool that syncs JSON configuration files across multiple Git repositories by creating pull requests.
+A CLI tool that syncs JSON configuration files across multiple GitHub and Azure DevOps repositories by creating pull requests.
 
 ## Table of Contents
 
