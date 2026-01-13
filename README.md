@@ -19,7 +19,7 @@ A CLI tool that syncs JSON configuration files across multiple Git repositories 
 ### From npm
 
 ```bash
-npm install -g json-config-sync
+npm install -g @aspruyt/json-config-sync
 ```
 
 ### From Source

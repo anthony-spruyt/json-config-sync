@@ -1,5 +1,5 @@
 {
-  "name": "json-config-sync",
+  "name": "@aspruyt/json-config-sync",
   "version": "1.0.0",
   "description": "CLI tool to sync JSON configuration files across multiple repositories",
   "type": "module",
