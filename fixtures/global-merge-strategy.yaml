@@ -1,0 +1,19 @@
+# Fixture testing global mergeStrategy: append
+fileName: global-merge.config.json
+mergeStrategy: append
+
+json:
+  features:
+    - base-feature-1
+    - base-feature-2
+  tags:
+    - tag1
+
+repos:
+  - git: git@github.com:org/repo-global-append.git
+    json:
+      features:
+        - added-feature
+      tags:
+        - tag2
+        - tag3

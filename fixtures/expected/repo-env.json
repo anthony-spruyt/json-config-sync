@@ -1,0 +1,11 @@
+{
+  "database": {
+    "host": "localhost",
+    "port": "5432"
+  },
+  "api": {
+    "url": "https://api.example.com",
+    "timeout": 30000
+  },
+  "serviceName": "my-service"
+}

@@ -139,9 +139,25 @@ describe('Integration Test', () => {
     );
 
     assert.ok(fileContent, 'File should exist in PR branch');
-    assert.ok(fileContent.includes('prop1'), 'File should contain expected content');
 
-    console.log('  File content verified');
+    // Parse and verify the merged JSON content
+    const json = JSON.parse(fileContent);
+    console.log('  File content:', JSON.stringify(json, null, 2));
+
+    // Verify overlay property overrides base
+    assert.equal(json.prop1, 'main', 'Overlay should override base prop1');
+
+    // Verify base properties are inherited
+    assert.equal(json.baseOnly, 'inherited-from-root', 'Base-only property should be inherited');
+    assert.deepEqual(json.prop2, { prop3: 'MyService' }, 'Base prop2 should be inherited');
+
+    // Verify overlay adds new properties
+    assert.equal(json.addedByOverlay, true, 'Overlay should add new properties');
+
+    // Verify nested base properties are preserved
+    assert.ok(json.prop4?.prop5?.length === 2, 'Nested arrays from base should be preserved');
+
+    console.log('  Merged content verified - base + overlay working correctly');
     console.log('\n=== Integration test passed ===\n');
   });
 });

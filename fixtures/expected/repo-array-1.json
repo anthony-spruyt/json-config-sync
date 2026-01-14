@@ -1,0 +1,16 @@
+{
+  "version": "2.0",
+  "environment": "production",
+  "logging": {
+    "level": "debug",
+    "format": "json"
+  },
+  "features": [
+    "health-check",
+    "metrics"
+  ],
+  "tags": [
+    "base"
+  ],
+  "team": "platform"
+}

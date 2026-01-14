@@ -1,0 +1,55 @@
+# Comprehensive fixture testing all features
+fileName: service.config.json
+mergeStrategy: replace
+
+json:
+  version: "2.0"
+  environment: production
+  logging:
+    level: info
+    format: json
+  features:
+    - health-check
+    - metrics
+  tags:
+    - base
+
+repos:
+  # Test 1: Git array expansion with overlay merge
+  - git:
+      - git@github.com:org/repo-array-1.git
+      - git@github.com:org/repo-array-2.git
+    json:
+      team: platform
+      logging:
+        level: debug
+
+  # Test 2: No json - inherits root json exactly
+  - git: git@github.com:org/repo-inherit.git
+
+  # Test 3: Override - ignores root json entirely
+  - git: git@github.com:org/repo-override.git
+    override: true
+    json:
+      version: "1.0"
+      legacy: true
+
+  # Test 4: Array merge with $arrayMerge: append
+  - git: git@github.com:org/repo-append.git
+    json:
+      features:
+        $arrayMerge: append
+        values:
+          - custom-feature
+      tags:
+        $arrayMerge: append
+        values:
+          - extra-tag
+
+  # Test 5: Array merge with $arrayMerge: prepend
+  - git: git@github.com:org/repo-prepend.git
+    json:
+      features:
+        $arrayMerge: prepend
+        values:
+          - priority-feature

@@ -16,6 +16,7 @@ A CLI tool that syncs JSON configuration files across multiple GitHub and Azure 
 - [Prerequisites](#prerequisites)
 - [Usage](#usage)
 - [Configuration Format](#configuration-format)
+- [Examples](#examples)
 - [Supported Git URL Formats](#supported-git-url-formats)
 - [CI/CD Integration](#cicd-integration)
 - [Output Examples](#output-examples)
@@ -35,44 +36,38 @@ gh auth login
 # Create config.yaml
 cat > config.yaml << 'EOF'
 fileName: .prettierrc.json
+
+# Base configuration inherited by all repos
+json:
+  semi: false
+  singleQuote: true
+  tabWidth: 2
+  trailingComma: es5
+
 repos:
-  - git: git@github.com:your-org/frontend-app.git
-    json:
-      semi: false
-      singleQuote: true
-      tabWidth: 2
-      trailingComma: es5
-  - git: git@github.com:your-org/backend-api.git
-    json:
-      semi: false
-      singleQuote: true
-      tabWidth: 2
-      trailingComma: es5
+  # Multiple repos can share the same config
+  - git:
+      - git@github.com:your-org/frontend-app.git
+      - git@github.com:your-org/backend-api.git
+      - git@github.com:your-org/shared-lib.git
 EOF
 
 # Run
 json-config-sync --config ./config.yaml
 ```
 
-**Result:** PRs are created in both repos with `.prettierrc.json`:
-
-```json
-{
-  "semi": false,
-  "singleQuote": true,
-  "tabWidth": 2,
-  "trailingComma": "es5"
-}
-```
+**Result:** PRs are created in all three repos with identical `.prettierrc.json` files.
 
 ## Features
 
-- Reads configuration from a YAML file
-- Supports both GitHub and Azure DevOps repositories
-- Creates PRs automatically using `gh` CLI (GitHub) or `az` CLI (Azure DevOps)
-- Continues processing if individual repos fail
-- Supports dry-run mode for testing
-- Progress logging with summary report
+- **JSON Inheritance** - Define base config once, override per-repo as needed
+- **Multi-Repo Targeting** - Apply same config to multiple repos with array syntax
+- **Environment Variables** - Use `${VAR}` syntax for dynamic values
+- **Merge Strategies** - Control how arrays merge (replace, append, prepend)
+- **Override Mode** - Skip merging entirely for specific repos
+- **GitHub & Azure DevOps** - Works with both platforms
+- **Dry-Run Mode** - Preview changes without creating PRs
+- **Error Resilience** - Continues processing if individual repos fail
 
 ## Installation
 
@@ -137,30 +132,160 @@ json-config-sync --config ./config.yaml --work-dir ./my-temp
 
 ## Configuration Format
 
-Create a YAML file with the following structure:
+### Basic Structure
 
 ```yaml
-fileName: my.config.json
-repos:
-  - git: git@github.com:example-org/repo1.git
-    json:
-      setting1: value1
-      nested:
-        setting2: value2
-  - git: git@ssh.dev.azure.com:v3/example-org/project/repo2
-    json:
-      setting1: differentValue
-      setting3: value
+fileName: my.config.json      # Target file to create in each repo
+mergeStrategy: replace        # Default array merge strategy (optional)
+
+json:                         # Base JSON config (optional)
+  key: value
+
+repos:                        # List of repositories
+  - git: git@github.com:org/repo.git
+    json:                     # Per-repo overlay (optional if base json exists)
+      key: override
 ```
 
-### Fields
+### Root-Level Fields
 
-| Field          | Description                                             |
-| -------------- | ------------------------------------------------------- |
-| `fileName`     | The name of the JSON file to create/update in each repo |
-| `repos`        | Array of repository configurations                      |
-| `repos[].git`  | Git URL of the repository (SSH or HTTPS)                |
-| `repos[].json` | The JSON content to write to the file                   |
+| Field           | Description                                                  | Required |
+| --------------- | ------------------------------------------------------------ | -------- |
+| `fileName`      | Name of the JSON file to create/update in each repo          | Yes      |
+| `json`          | Base JSON config inherited by all repos                      | No*      |
+| `mergeStrategy` | Default array merge strategy: `replace`, `append`, `prepend` | No       |
+| `repos`         | Array of repository configurations                           | Yes      |
+
+\* Required if any repo entry omits the `json` field.
+
+### Per-Repo Fields
+
+| Field      | Description                                            | Required |
+| ---------- | ------------------------------------------------------ | -------- |
+| `git`      | Git URL (string) or array of URLs                      | Yes      |
+| `json`     | JSON overlay merged onto base (optional if base exists)| No*      |
+| `override` | If `true`, ignore base JSON and use only this repo's   | No       |
+
+\* Required if no root-level `json` is defined.
+
+### Environment Variables
+
+Use `${VAR}` syntax in JSON string values:
+
+```yaml
+json:
+  apiUrl: ${API_URL}                    # Required - errors if not set
+  environment: ${ENV:-development}      # With default value
+  secretKey: ${SECRET:?Secret required} # Required with custom error message
+```
+
+### Merge Directives
+
+Control array merging with the `$arrayMerge` directive:
+
+```yaml
+json:
+  features:
+    - core
+    - monitoring
+
+repos:
+  - git: git@github.com:org/repo.git
+    json:
+      features:
+        $arrayMerge: append  # append | prepend | replace
+        values:
+          - custom-feature   # Results in: [core, monitoring, custom-feature]
+```
+
+## Examples
+
+### Shared Config Across Teams
+
+Define common settings once, customize per team:
+
+```yaml
+fileName: service.config.json
+
+json:
+  version: "2.0"
+  logging:
+    level: info
+    format: json
+  features:
+    - health-check
+    - metrics
+
+repos:
+  # Platform team repos - add extra features
+  - git:
+      - git@github.com:org/api-gateway.git
+      - git@github.com:org/auth-service.git
+    json:
+      team: platform
+      features:
+        $arrayMerge: append
+        values:
+          - tracing
+          - rate-limiting
+
+  # Data team repos - different logging
+  - git:
+      - git@github.com:org/data-pipeline.git
+      - git@github.com:org/analytics.git
+    json:
+      team: data
+      logging:
+        level: debug
+
+  # Legacy service - completely different config
+  - git: git@github.com:org/legacy-api.git
+    override: true
+    json:
+      version: "1.0"
+      legacy: true
+```
+
+### Environment-Specific Values
+
+Use environment variables for secrets and environment-specific values:
+
+```yaml
+fileName: app.config.json
+
+json:
+  database:
+    host: ${DB_HOST:-localhost}
+    port: ${DB_PORT:-5432}
+    password: ${DB_PASSWORD:?Database password required}
+
+  api:
+    baseUrl: ${API_BASE_URL}
+    timeout: 30000
+
+repos:
+  - git: git@github.com:org/backend.git
+```
+
+### Simple Multi-Repo Sync
+
+When all repos need identical config:
+
+```yaml
+fileName: .eslintrc.json
+
+json:
+  extends: ["@org/eslint-config"]
+  rules:
+    no-console: warn
+
+repos:
+  - git:
+      - git@github.com:org/frontend.git
+      - git@github.com:org/backend.git
+      - git@github.com:org/shared-lib.git
+      - git@github.com:org/cli-tool.git
+```
 
 ## Supported Git URL Formats
 
@@ -179,7 +304,12 @@ repos:
 ```mermaid
 flowchart TB
     subgraph Input
-        YAML[/"YAML Config File<br/>fileName + repos[]"/]
+        YAML[/"YAML Config File<br/>fileName + json + repos[]"/]
+    end
+
+    subgraph Normalization
+        EXPAND[Expand git arrays] --> MERGE[Merge base + overlay JSON]
+        MERGE --> ENV[Interpolate env vars]
     end
 
     subgraph Processing["For Each Repository"]
@@ -202,47 +332,22 @@ flowchart TB
         AZ_PR --> AZ_URL[/"Azure DevOps PR URL"/]
     end
 
-    YAML --> CLONE
+    YAML --> EXPAND
+    ENV --> CLONE
 ```
 
 For each repository in the config, the tool:
 
-1. Cleans the temporary workspace
-2. Detects if repo is GitHub or Azure DevOps
-3. Clones the repository
-4. Creates/checks out branch `chore/sync-{sanitized-filename}`
-5. Generates the JSON file from config
-6. Checks for changes (skips if no changes)
-7. Commits and pushes changes
-8. Creates a pull request
-
-## Example
-
-Given this config file (`config.yaml`):
-
-```yaml
-fileName: my.config.json
-repos:
-  - git: git@github.com:example-org/my-service.git
-    json:
-      environment: production
-      settings:
-        feature1: true
-        feature2: false
-```
-
-Running:
-
-```bash
-json-config-sync --config ./config.yaml
-```
-
-Will:
-
-1. Clone `example-org/my-service`
-2. Create branch `chore/sync-my-config`
-3. Write `my.config.json` with the specified content
-4. Create a PR titled "chore: sync my.config.json"
+1. Expands git URL arrays into individual entries
+2. Merges base JSON with per-repo overlay
+3. Interpolates environment variables
+4. Cleans the temporary workspace
+5. Clones the repository
+6. Creates/checks out branch `chore/sync-{sanitized-filename}`
+7. Generates the JSON file
+8. Checks for changes (skips if no changes)
+9. Commits and pushes changes
+10. Creates a pull request
 
 ## CI/CD Integration
 
@@ -373,6 +478,19 @@ The tool automatically reuses existing branches. If you see unexpected behavior:
 ```bash
 # Delete the remote branch to start fresh
 git push origin --delete chore/sync-my-config
+```
+
+### Missing Environment Variables
+
+If you see "Missing required environment variable" errors:
+
+```bash
+# Set the variable before running
+export MY_VAR=value
+json-config-sync --config ./config.yaml
+
+# Or use default values in config
+# ${MY_VAR:-default-value}
 ```
 
 ### Network/Proxy Issues

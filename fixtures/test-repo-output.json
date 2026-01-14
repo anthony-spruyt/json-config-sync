@@ -6,10 +6,7 @@
   "prop4": {
     "prop5": [
       {
-        "prop6": "platform"
-      },
-      {
-        "prop7": "engineering"
+        "prop6": "product"
       }
     ]
   }

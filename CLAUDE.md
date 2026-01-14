@@ -8,7 +8,57 @@ TypeScript CLI tool that syncs JSON configuration files across multiple Git repo
 
 ## Architecture
 
+### Config Normalization Pipeline (config.ts)
+
+The config loading process normalizes raw YAML input into a standardized format:
+
+```
+Raw YAML → Parse → Validate → Expand git arrays → Deep merge → Env interpolate → Config
+```
+
+**Types**:
+- `RawConfig` / `RawRepoConfig`: As parsed from YAML (flexible input format)
+- `Config` / `RepoConfig`: Normalized output (each entry has single git URL + merged JSON)
+
+**Pipeline Steps**:
+1. **Validation**: Check required fields, validate git URLs exist
+2. **Git Array Expansion**: `git: [url1, url2]` becomes two separate repo entries
+3. **JSON Merge**: Per-repo `json` overlays onto root-level `json` using deep merge
+4. **Env Interpolation**: Replace `${VAR}` placeholders with environment values
+
+### Deep Merge (merge.ts)
+
+Recursive object merging with configurable array handling:
+
+**Key Functions**:
+- `deepMerge(base, overlay, ctx)`: Merge two objects, overlay wins for conflicts
+- `stripMergeDirectives(obj)`: Remove `$`-prefixed keys from output
+- `createMergeContext(strategy)`: Create context with default array strategy
+
+**Array Merge Strategies**:
+- `replace` (default): Overlay array replaces base array
+- `append`: Overlay array concatenated after base array
+- `prepend`: Overlay array concatenated before base array
+
+**Merge Directives**:
+- `$arrayMerge`: Set strategy for child arrays in that object
+- Directive keys stripped from final output
+
+### Environment Interpolation (env.ts)
+
+Replaces environment variable placeholders in JSON string values:
+
+**Supported Syntax**:
+- `${VAR}`: Required variable (errors if missing in strict mode)
+- `${VAR:-default}`: Use default if variable is not set
+- `${VAR:?message}`: Required with custom error message
+
+**Options**:
+- `strict: true` (default): Throw on missing required variables
+- `strict: false`: Leave placeholders as-is if missing
+
 ### Orchestration Flow (index.ts)
+
 The tool processes repositories sequentially with a 9-step workflow per repo:
 1. Clean workspace (remove old clones)
 2. Clone repository
@@ -23,6 +73,7 @@ The tool processes repositories sequentially with a 9-step workflow per repo:
 **Error Resilience**: If any repo fails, the tool continues processing remaining repos. Errors are logged and summarized at the end. Exit code 1 only if failures occurred.
 
 ### Platform Detection (repo-detector.ts)
+
 Auto-detects GitHub vs Azure DevOps from git URL patterns:
 - GitHub SSH: `git@github.com:owner/repo.git`
 - GitHub HTTPS: `https://github.com/owner/repo.git`
@@ -32,6 +83,7 @@ Auto-detects GitHub vs Azure DevOps from git URL patterns:
 Returns `RepoInfo` with normalized fields (owner, repo, organization, project) used by PR creator.
 
 ### PR Creation Strategy (pr-creator.ts)
+
 **Idempotency**: Checks for existing PR on branch before creating new one. Returns URL of existing PR if found.
 
 **Shell Safety**: Uses `escapeShellArg()` to wrap all user-provided strings passed to `gh`/`az` CLI. Special handling: wraps in single quotes and escapes embedded single quotes as `'\''`.
@@ -39,6 +91,7 @@ Returns `RepoInfo` with normalized fields (owner, repo, organization, project) u
 **Template System**: Loads PR body from `PR.md` file (included in npm package). Uses `{{FILE_NAME}}` and `{{ACTION}}` placeholders. Writes body to temp file to avoid shell escaping issues with multiline strings.
 
 ### Git Operations (git-ops.ts)
+
 **Branch Strategy**:
 - Sanitizes filename for branch name (removes extension, lowercase, alphanumeric+dashes only)
 - Checks if branch exists on remote first (`git fetch origin <branch>`)
@@ -55,14 +108,30 @@ Returns `RepoInfo` with normalized fields (owner, repo, organization, project) u
 
 ## Configuration Format
 
-YAML structure:
+YAML structure with inheritance:
 ```yaml
-fileName: my.config.json  # Target file to create in each repo
+fileName: my.config.json     # Target file to create in each repo
+mergeStrategy: replace       # Default array merge: replace | append | prepend
+
+json:                        # Base JSON config (inherited by all repos)
+  key: value
+  features:
+    - core
+
 repos:
-  - git: git@github.com:org/repo.git
-    json: { "key": "value" }  # Will be formatted with 2-space indent
-  - git: git@ssh.dev.azure.com:v3/org/project/repo
-    json: { "key": "differentValue" }
+  - git:                     # Can be string or array of strings
+      - git@github.com:org/repo1.git
+      - git@github.com:org/repo2.git
+    json:                    # Overlay merged onto base json
+      key: override
+      features:
+        $arrayMerge: append  # Use append for this array
+        values:
+          - custom
+  - git: git@github.com:org/repo3.git
+    override: true           # Skip merging, use only this json
+    json:
+      different: config
 ```
 
 JSON formatting: Always uses 2-space indentation via `JSON.stringify(json, null, 2)` plus trailing newline.
@@ -71,7 +140,7 @@ JSON formatting: Always uses 2-space indentation via `JSON.stringify(json, null,
 
 ```bash
 npm run build              # Compile TypeScript to dist/
-npm test                   # Unit tests (config.test.ts only)
+npm test                   # Run all unit tests
 npm run test:integration   # Build + integration test (requires gh auth)
 npm run dev                # Run with fixtures/test-repos-input.yaml
 npm run release:patch      # Bump patch version, create tag, push
@@ -94,7 +163,12 @@ npm run release:patch      # Bump patch version, create tag, push
 
 ## Testing Approach
 
-**Unit Tests**: Focus on config parsing and JSON conversion. Use fixtures in `fixtures/` directory.
+**Unit Tests**: Modular test files per module:
+- `config.test.ts`: Config validation, normalization, integration
+- `merge.test.ts`: Deep merge logic, array strategies, directives
+- `env.test.ts`: Environment variable interpolation
+
+Use fixtures in `fixtures/` directory.
 
 **Integration Tests**: End-to-end test that:
 1. Sets up clean state in test repo
@@ -103,3 +177,18 @@ npm run release:patch      # Bump patch version, create tag, push
 4. Checks file content in PR branch
 
 **No Mocking**: Git operations and CLI tools are not mocked. Integration test uses real GitHub API.
+
+## File Structure
+
+```
+src/
+  index.ts          # CLI entry point, orchestration
+  config.ts         # Config loading, validation, normalization
+  merge.ts          # Deep merge with array strategies
+  env.ts            # Environment variable interpolation
+  git-ops.ts        # Git clone, branch, commit, push
+  repo-detector.ts  # GitHub/Azure URL parsing
+  pr-creator.ts     # PR creation via gh/az CLI
+  logger.ts         # Console output formatting
+  *.test.ts         # Unit tests per module
+```
