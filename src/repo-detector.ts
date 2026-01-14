@@ -11,9 +11,9 @@ export interface RepoInfo {
 }
 
 export function detectRepoType(gitUrl: string): RepoType {
-  // Use strict pattern matching to prevent URL substring attacks
-  // Check for Azure DevOps SSH format: git@ssh.dev.azure.com:v3/...
-  if (/^git@ssh\.dev\.azure\.com:v3\//.test(gitUrl)) {
+  // Check for Azure DevOps SSH format: git@ssh.dev.azure.com:...
+  // Use broader pattern to catch malformed Azure URLs
+  if (/^git@ssh\.dev\.azure\.com:/.test(gitUrl)) {
     return 'azure-devops';
   }
   // Check for Azure DevOps HTTPS format: https://dev.azure.com/...
@@ -35,7 +35,8 @@ export function parseGitUrl(gitUrl: string): RepoInfo {
 
 function parseGitHubUrl(gitUrl: string): RepoInfo {
   // Handle SSH format: git@github.com:owner/repo.git
-  const sshMatch = gitUrl.match(/git@github\.com:([^/]+)\/([^.]+)(?:\.git)?/);
+  // Use (.+?) with end anchor to handle repo names with dots (e.g., my.repo.git)
+  const sshMatch = gitUrl.match(/git@github\.com:([^/]+)\/(.+?)(?:\.git)?$/);
   if (sshMatch) {
     return {
       type: 'github',
@@ -46,7 +47,8 @@ function parseGitHubUrl(gitUrl: string): RepoInfo {
   }
 
   // Handle HTTPS format: https://github.com/owner/repo.git
-  const httpsMatch = gitUrl.match(/https?:\/\/github\.com\/([^/]+)\/([^.]+)(?:\.git)?/);
+  // Use (.+?) with end anchor to handle repo names with dots
+  const httpsMatch = gitUrl.match(/https?:\/\/github\.com\/([^/]+)\/(.+?)(?:\.git)?$/);
   if (httpsMatch) {
     return {
       type: 'github',
@@ -61,7 +63,8 @@ function parseGitHubUrl(gitUrl: string): RepoInfo {
 
 function parseAzureDevOpsUrl(gitUrl: string): RepoInfo {
   // Handle SSH format: git@ssh.dev.azure.com:v3/organization/project/repo
-  const sshMatch = gitUrl.match(/git@ssh\.dev\.azure\.com:v3\/([^/]+)\/([^/]+)\/([^.]+)/);
+  // Use (.+?) with end anchor to handle repo names with dots
+  const sshMatch = gitUrl.match(/git@ssh\.dev\.azure\.com:v3\/([^/]+)\/([^/]+)\/(.+?)(?:\.git)?$/);
   if (sshMatch) {
     return {
       type: 'azure-devops',
@@ -74,7 +77,8 @@ function parseAzureDevOpsUrl(gitUrl: string): RepoInfo {
   }
 
   // Handle HTTPS format: https://dev.azure.com/organization/project/_git/repo
-  const httpsMatch = gitUrl.match(/https?:\/\/dev\.azure\.com\/([^/]+)\/([^/]+)\/_git\/([^.]+)/);
+  // Use (.+?) with end anchor to handle repo names with dots
+  const httpsMatch = gitUrl.match(/https?:\/\/dev\.azure\.com\/([^/]+)\/([^/]+)\/_git\/(.+?)(?:\.git)?$/);
   if (httpsMatch) {
     return {
       type: 'azure-devops',

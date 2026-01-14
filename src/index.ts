@@ -3,11 +3,22 @@
 import { program } from 'commander';
 import { resolve, join } from 'node:path';
 import { existsSync } from 'node:fs';
+import { randomUUID } from 'node:crypto';
 import { loadConfig, convertContentToString } from './config.js';
 import { parseGitUrl, getRepoDisplayName } from './repo-detector.js';
 import { GitOps, sanitizeBranchName } from './git-ops.js';
 import { createPR } from './pr-creator.js';
 import { logger } from './logger.js';
+
+/**
+ * Generates a unique workspace directory name to avoid collisions
+ * when multiple CLI instances run concurrently.
+ */
+function generateWorkspaceName(index: number): string {
+  const timestamp = Date.now();
+  const uuid = randomUUID().slice(0, 8);
+  return `repo-${timestamp}-${index}-${uuid}`;
+}
 
 interface CLIOptions {
   config: string;
@@ -61,7 +72,7 @@ async function main(): Promise<void> {
     }
 
     const repoName = getRepoDisplayName(repoInfo);
-    const workDir = resolve(join(options.workDir ?? './tmp', `repo-${i}`));
+    const workDir = resolve(join(options.workDir ?? './tmp', generateWorkspaceName(i)));
 
     try {
       logger.progress(current, repoName, 'Processing...');
@@ -77,26 +88,34 @@ async function main(): Promise<void> {
       gitOps.clone(repoInfo.gitUrl);
 
       // Step 3: Get default branch for PR base
-      const baseBranch = gitOps.getDefaultBranch();
-      logger.info(`Default branch: ${baseBranch}`);
+      const { branch: baseBranch, method: detectionMethod } = gitOps.getDefaultBranch();
+      logger.info(`Default branch: ${baseBranch} (detected via ${detectionMethod})`);
 
       // Step 4: Create/checkout branch
       logger.info(`Switching to branch: ${branchName}`);
       gitOps.createBranch(branchName);
 
+      // Determine if creating or updating (check BEFORE writing)
+      const action: 'create' | 'update' = existsSync(join(workDir, config.fileName)) ? 'update' : 'create';
+
       // Step 5: Write config file
       logger.info(`Writing ${config.fileName}...`);
       const fileContent = convertContentToString(repoConfig.content, config.fileName);
-      gitOps.writeFile(config.fileName, fileContent);
 
       // Step 6: Check for changes
-      if (!gitOps.hasChanges()) {
+      // In dry-run mode, compare content directly since we don't write the file
+      // In normal mode, write the file first then check git status
+      const wouldHaveChanges = options.dryRun
+        ? gitOps.wouldChange(config.fileName, fileContent)
+        : (() => {
+            gitOps.writeFile(config.fileName, fileContent);
+            return gitOps.hasChanges();
+          })();
+
+      if (!wouldHaveChanges) {
         logger.skip(current, repoName, 'No changes detected');
         continue;
       }
-
-      // Determine if creating or updating
-      const action: 'create' | 'update' = existsSync(join(workDir, config.fileName)) ? 'update' : 'create';
 
       // Step 7: Commit
       logger.info('Committing changes...');
