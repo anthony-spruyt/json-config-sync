@@ -1,8 +1,8 @@
-# Integration test config - tests root-level JSON with overlay merge
+# Integration test config - tests root-level content with overlay merge
 fileName: my.config.json
 
 # Base configuration inherited by all repos
-json:
+content:
   prop1: base-value
   prop2:
     prop3: MyService
@@ -14,7 +14,7 @@ json:
 
 repos:
   - git: https://github.com/anthony-spruyt/json-config-sync-test.git
-    json:
+    content:
       # Override prop1, merge with base, add new property
       prop1: main
       addedByOverlay: true

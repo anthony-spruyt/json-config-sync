@@ -5,7 +5,7 @@
 [![npm version](https://img.shields.io/npm/v/@aspruyt/json-config-sync.svg)](https://www.npmjs.com/package/@aspruyt/json-config-sync)
 [![npm downloads](https://img.shields.io/npm/dw/@aspruyt/json-config-sync.svg)](https://www.npmjs.com/package/@aspruyt/json-config-sync)
 
-A CLI tool that syncs JSON configuration files across multiple GitHub and Azure DevOps repositories by creating pull requests.
+A CLI tool that syncs JSON or YAML configuration files across multiple GitHub and Azure DevOps repositories by creating pull requests. Output format is automatically detected from the target filename extension.
 
 ## Table of Contents
 
@@ -38,7 +38,7 @@ cat > config.yaml << 'EOF'
 fileName: .prettierrc.json
 
 # Base configuration inherited by all repos
-json:
+content:
   semi: false
   singleQuote: true
   tabWidth: 2
@@ -60,7 +60,8 @@ json-config-sync --config ./config.yaml
 
 ## Features
 
-- **JSON Inheritance** - Define base config once, override per-repo as needed
+- **JSON/YAML Output** - Automatically outputs JSON or YAML based on filename extension
+- **Content Inheritance** - Define base config once, override per-repo as needed
 - **Multi-Repo Targeting** - Apply same config to multiple repos with array syntax
 - **Environment Variables** - Use `${VAR}` syntax for dynamic values
 - **Merge Strategies** - Control how arrays merge (replace, append, prepend)
@@ -135,45 +136,45 @@ json-config-sync --config ./config.yaml --work-dir ./my-temp
 ### Basic Structure
 
 ```yaml
-fileName: my.config.json      # Target file to create in each repo
+fileName: my.config.json      # Target file (.json outputs JSON, .yaml/.yml outputs YAML)
 mergeStrategy: replace        # Default array merge strategy (optional)
 
-json:                         # Base JSON config (optional)
+content:                      # Base config content (optional)
   key: value
 
 repos:                        # List of repositories
   - git: git@github.com:org/repo.git
-    json:                     # Per-repo overlay (optional if base json exists)
+    content:                  # Per-repo overlay (optional if base content exists)
       key: override
 ```
 
 ### Root-Level Fields
 
-| Field           | Description                                                  | Required |
-| --------------- | ------------------------------------------------------------ | -------- |
-| `fileName`      | Name of the JSON file to create/update in each repo          | Yes      |
-| `json`          | Base JSON config inherited by all repos                      | No*      |
-| `mergeStrategy` | Default array merge strategy: `replace`, `append`, `prepend` | No       |
-| `repos`         | Array of repository configurations                           | Yes      |
+| Field           | Description                                                           | Required |
+| --------------- | --------------------------------------------------------------------- | -------- |
+| `fileName`      | Target file name (`.json` → JSON output, `.yaml`/`.yml` → YAML output)| Yes      |
+| `content`       | Base config inherited by all repos                                    | No*      |
+| `mergeStrategy` | Default array merge strategy: `replace`, `append`, `prepend`          | No       |
+| `repos`         | Array of repository configurations                                    | Yes      |
 
-\* Required if any repo entry omits the `json` field.
+\* Required if any repo entry omits the `content` field.
 
 ### Per-Repo Fields
 
-| Field      | Description                                            | Required |
-| ---------- | ------------------------------------------------------ | -------- |
-| `git`      | Git URL (string) or array of URLs                      | Yes      |
-| `json`     | JSON overlay merged onto base (optional if base exists)| No*      |
-| `override` | If `true`, ignore base JSON and use only this repo's   | No       |
+| Field      | Description                                               | Required |
+| ---------- | --------------------------------------------------------- | -------- |
+| `git`      | Git URL (string) or array of URLs                         | Yes      |
+| `content`  | Content overlay merged onto base (optional if base exists)| No*      |
+| `override` | If `true`, ignore base content and use only this repo's   | No       |
 
-\* Required if no root-level `json` is defined.
+\* Required if no root-level `content` is defined.
 
 ### Environment Variables
 
-Use `${VAR}` syntax in JSON string values:
+Use `${VAR}` syntax in string values:
 
 ```yaml
-json:
+content:
   apiUrl: ${API_URL}                    # Required - errors if not set
   environment: ${ENV:-development}      # With default value
   secretKey: ${SECRET:?Secret required} # Required with custom error message
@@ -184,14 +185,14 @@ json:
 Control array merging with the `$arrayMerge` directive:
 
 ```yaml
-json:
+content:
   features:
     - core
     - monitoring
 
 repos:
   - git: git@github.com:org/repo.git
-    json:
+    content:
       features:
         $arrayMerge: append  # append | prepend | replace
         values:
@@ -207,7 +208,7 @@ Define common settings once, customize per team:
 ```yaml
 fileName: service.config.json
 
-json:
+content:
   version: "2.0"
   logging:
     level: info
@@ -221,7 +222,7 @@ repos:
   - git:
       - git@github.com:org/api-gateway.git
       - git@github.com:org/auth-service.git
-    json:
+    content:
       team: platform
       features:
         $arrayMerge: append
@@ -233,7 +234,7 @@ repos:
   - git:
       - git@github.com:org/data-pipeline.git
       - git@github.com:org/analytics.git
-    json:
+    content:
       team: data
       logging:
         level: debug
@@ -241,7 +242,7 @@ repos:
   # Legacy service - completely different config
   - git: git@github.com:org/legacy-api.git
     override: true
-    json:
+    content:
       version: "1.0"
       legacy: true
 ```
@@ -253,7 +254,7 @@ Use environment variables for secrets and environment-specific values:
 ```yaml
 fileName: app.config.json
 
-json:
+content:
   database:
     host: ${DB_HOST:-localhost}
     port: ${DB_PORT:-5432}
@@ -274,7 +275,7 @@ When all repos need identical config:
 ```yaml
 fileName: .eslintrc.json
 
-json:
+content:
   extends: ["@org/eslint-config"]
   rules:
     no-console: warn
@@ -304,17 +305,17 @@ repos:
 ```mermaid
 flowchart TB
     subgraph Input
-        YAML[/"YAML Config File<br/>fileName + json + repos[]"/]
+        YAML[/"YAML Config File<br/>fileName + content + repos[]"/]
     end
 
     subgraph Normalization
-        EXPAND[Expand git arrays] --> MERGE[Merge base + overlay JSON]
+        EXPAND[Expand git arrays] --> MERGE[Merge base + overlay content]
         MERGE --> ENV[Interpolate env vars]
     end
 
     subgraph Processing["For Each Repository"]
         CLONE[Clone Repo] --> BRANCH[Create/Checkout Branch<br/>chore/sync-filename]
-        BRANCH --> WRITE[Write JSON File]
+        BRANCH --> WRITE[Write Config File<br/>JSON or YAML]
         WRITE --> CHECK{Changes?}
         CHECK -->|No| SKIP[Skip - No Changes]
         CHECK -->|Yes| COMMIT[Commit Changes]
@@ -339,12 +340,12 @@ flowchart TB
 For each repository in the config, the tool:
 
 1. Expands git URL arrays into individual entries
-2. Merges base JSON with per-repo overlay
+2. Merges base content with per-repo overlay
 3. Interpolates environment variables
 4. Cleans the temporary workspace
 5. Clones the repository
 6. Creates/checks out branch `chore/sync-{sanitized-filename}`
-7. Generates the JSON file
+7. Generates the config file (JSON or YAML based on filename extension)
 8. Checks for changes (skips if no changes)
 9. Commits and pushes changes
 10. Creates a pull request

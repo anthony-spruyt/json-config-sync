@@ -4,7 +4,8 @@ import { writeFileSync, mkdirSync, rmSync, readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
-import { loadConfig, convertJsonToString } from './config.js';
+import { loadConfig, convertContentToString } from './config.js';
+import { parse } from 'yaml';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -36,7 +37,7 @@ describe('Config', () => {
       const path = createTestConfig(`
 repos:
   - git: git@github.com:org/repo.git
-    json:
+    content:
       key: value
 `);
       assert.throws(() => loadConfig(path), /Config missing required field: fileName/);
@@ -61,32 +62,32 @@ repos: not-an-array
       const path = createTestConfig(`
 fileName: config.json
 repos:
-  - json:
-      key: value
+  - content:
+    key: value
 `);
       assert.throws(() => loadConfig(path), /Repo at index 0 missing required field: git/);
     });
 
-    test('allows missing repo.json when root json exists', () => {
+    test('allows missing repo.content when root content exists', () => {
       const path = createTestConfig(`
 fileName: config.json
-json:
+content:
   rootKey: rootValue
 repos:
   - git: git@github.com:org/repo.git
 `);
       const config = loadConfig(path);
       assert.equal(config.repos.length, 1);
-      assert.deepEqual(config.repos[0].json, { rootKey: 'rootValue' });
+      assert.deepEqual(config.repos[0].content, { rootKey: 'rootValue' });
     });
 
-    test('throws when repo.json missing and no root json', () => {
+    test('throws when repo.content missing and no root content', () => {
       const path = createTestConfig(`
 fileName: config.json
 repos:
   - git: git@github.com:org/repo.git
 `);
-      assert.throws(() => loadConfig(path), /Repo at index 0 missing required field: json/);
+      assert.throws(() => loadConfig(path), /Repo at index 0 missing required field: content/);
     });
 
     test('validates git field in array syntax', () => {
@@ -96,7 +97,7 @@ repos:
   - git:
       - git@github.com:org/repo1.git
       - git@github.com:org/repo2.git
-    json:
+    content:
       key: value
 `);
       const config = loadConfig(path);
@@ -110,7 +111,7 @@ repos:
 fileName: config.json
 repos:
   - git: git@github.com:org/repo.git
-    json:
+    content:
       key: value
 `);
       const config = loadConfig(path);
@@ -126,7 +127,7 @@ repos:
       - git@github.com:org/repo1.git
       - git@github.com:org/repo2.git
       - git@github.com:org/repo3.git
-    json:
+    content:
       key: value
 `);
       const config = loadConfig(path);
@@ -136,19 +137,19 @@ repos:
       assert.equal(config.repos[2].git, 'git@github.com:org/repo3.git');
     });
 
-    test('preserves json across expanded entries', () => {
+    test('preserves content across expanded entries', () => {
       const path = createTestConfig(`
 fileName: config.json
 repos:
   - git:
       - git@github.com:org/repo1.git
       - git@github.com:org/repo2.git
-    json:
+    content:
       shared: value
 `);
       const config = loadConfig(path);
-      assert.deepEqual(config.repos[0].json, { shared: 'value' });
-      assert.deepEqual(config.repos[1].json, { shared: 'value' });
+      assert.deepEqual(config.repos[0].content, { shared: 'value' });
+      assert.deepEqual(config.repos[1].content, { shared: 'value' });
     });
 
     test('mixed single and array git entries', () => {
@@ -156,30 +157,30 @@ repos:
 fileName: config.json
 repos:
   - git: git@github.com:org/single.git
-    json:
+    content:
       type: single
   - git:
       - git@github.com:org/array1.git
       - git@github.com:org/array2.git
-    json:
+    content:
       type: array
 `);
       const config = loadConfig(path);
       assert.equal(config.repos.length, 3);
       assert.equal(config.repos[0].git, 'git@github.com:org/single.git');
-      assert.deepEqual(config.repos[0].json, { type: 'single' });
+      assert.deepEqual(config.repos[0].content, { type: 'single' });
       assert.equal(config.repos[1].git, 'git@github.com:org/array1.git');
-      assert.deepEqual(config.repos[1].json, { type: 'array' });
+      assert.deepEqual(config.repos[1].content, { type: 'array' });
       assert.equal(config.repos[2].git, 'git@github.com:org/array2.git');
-      assert.deepEqual(config.repos[2].json, { type: 'array' });
+      assert.deepEqual(config.repos[2].content, { type: 'array' });
     });
   });
 
-  describe('json inheritance', () => {
-    test('uses root json when repo.json missing', () => {
+  describe('content inheritance', () => {
+    test('uses root content when repo.content missing', () => {
       const path = createTestConfig(`
 fileName: config.json
-json:
+content:
   base: value
   nested:
     key: nested-value
@@ -187,26 +188,26 @@ repos:
   - git: git@github.com:org/repo.git
 `);
       const config = loadConfig(path);
-      assert.deepEqual(config.repos[0].json, {
+      assert.deepEqual(config.repos[0].content, {
         base: 'value',
         nested: { key: 'nested-value' },
       });
     });
 
-    test('merges repo.json onto root json', () => {
+    test('merges repo.content onto root content', () => {
       const path = createTestConfig(`
 fileName: config.json
-json:
+content:
   base: value
   override: original
 repos:
   - git: git@github.com:org/repo.git
-    json:
+    content:
       override: updated
       added: new
 `);
       const config = loadConfig(path);
-      assert.deepEqual(config.repos[0].json, {
+      assert.deepEqual(config.repos[0].content, {
         base: 'value',
         override: 'updated',
         added: 'new',
@@ -216,44 +217,44 @@ repos:
     test('deep merges nested objects', () => {
       const path = createTestConfig(`
 fileName: config.json
-json:
+content:
   nested:
     a: 1
     b: 2
 repos:
   - git: git@github.com:org/repo.git
-    json:
+    content:
       nested:
         b: 3
         c: 4
 `);
       const config = loadConfig(path);
-      assert.deepEqual(config.repos[0].json, {
+      assert.deepEqual(config.repos[0].content, {
         nested: { a: 1, b: 3, c: 4 },
       });
     });
 
-    test('override: true uses only repo json', () => {
+    test('override: true uses only repo content', () => {
       const path = createTestConfig(`
 fileName: config.json
-json:
+content:
   base: value
   nested:
     key: nested-value
 repos:
   - git: git@github.com:org/repo.git
     override: true
-    json:
+    content:
       only: repo-value
 `);
       const config = loadConfig(path);
-      assert.deepEqual(config.repos[0].json, { only: 'repo-value' });
+      assert.deepEqual(config.repos[0].content, { only: 'repo-value' });
     });
 
-    test('override requires json field', () => {
+    test('override requires content field', () => {
       const path = createTestConfig(`
 fileName: config.json
-json:
+content:
   base: value
 repos:
   - git: git@github.com:org/repo.git
@@ -261,37 +262,37 @@ repos:
 `);
       assert.throws(
         () => loadConfig(path),
-        /override: true but no json defined/
+        /override: true but no content defined/
       );
     });
 
     test('arrays are replaced by default', () => {
       const path = createTestConfig(`
 fileName: config.json
-json:
+content:
   items:
     - base1
     - base2
 repos:
   - git: git@github.com:org/repo.git
-    json:
+    content:
       items:
         - override1
 `);
       const config = loadConfig(path);
-      assert.deepEqual(config.repos[0].json, { items: ['override1'] });
+      assert.deepEqual(config.repos[0].content, { items: ['override1'] });
     });
 
     test('$arrayMerge: append concatenates arrays', () => {
       const path = createTestConfig(`
 fileName: config.json
-json:
+content:
   items:
     - base1
     - base2
 repos:
   - git: git@github.com:org/repo.git
-    json:
+    content:
       items:
         $arrayMerge: append
         values:
@@ -299,7 +300,7 @@ repos:
           - added2
 `);
       const config = loadConfig(path);
-      assert.deepEqual(config.repos[0].json, {
+      assert.deepEqual(config.repos[0].content, {
         items: ['base1', 'base2', 'added1', 'added2'],
       });
     });
@@ -307,19 +308,19 @@ repos:
     test('$arrayMerge directive is stripped from output', () => {
       const path = createTestConfig(`
 fileName: config.json
-json:
+content:
   items:
     - base
 repos:
   - git: git@github.com:org/repo.git
-    json:
+    content:
       items:
         $arrayMerge: append
         values:
           - added
 `);
       const config = loadConfig(path);
-      const jsonStr = JSON.stringify(config.repos[0].json);
+      const jsonStr = JSON.stringify(config.repos[0].content);
       assert.equal(jsonStr.includes('$arrayMerge'), false);
     });
 
@@ -327,21 +328,21 @@ repos:
       const path = createTestConfig(`
 fileName: config.json
 mergeStrategy: append
-json:
+content:
   items1:
     - a
   items2:
     - x
 repos:
   - git: git@github.com:org/repo.git
-    json:
+    content:
       items1:
         - b
       items2:
         - y
 `);
       const config = loadConfig(path);
-      assert.deepEqual(config.repos[0].json, {
+      assert.deepEqual(config.repos[0].content, {
         items1: ['a', 'b'],
         items2: ['x', 'y'],
       });
@@ -349,28 +350,28 @@ repos:
   });
 
   describe('environment variable interpolation', () => {
-    test('interpolates env vars in json values', () => {
+    test('interpolates env vars in content values', () => {
       const path = createTestConfig(`
 fileName: config.json
 repos:
   - git: git@github.com:org/repo.git
-    json:
+    content:
       value: \${TEST_ENV_VAR}
 `);
       const config = loadConfig(path);
-      assert.deepEqual(config.repos[0].json, { value: 'test-value' });
+      assert.deepEqual(config.repos[0].content, { value: 'test-value' });
     });
 
-    test('interpolates env vars in root json', () => {
+    test('interpolates env vars in root content', () => {
       const path = createTestConfig(`
 fileName: config.json
-json:
+content:
   rootValue: \${TEST_ENV_VAR}
 repos:
   - git: git@github.com:org/repo.git
 `);
       const config = loadConfig(path);
-      assert.deepEqual(config.repos[0].json, { rootValue: 'test-value' });
+      assert.deepEqual(config.repos[0].content, { rootValue: 'test-value' });
     });
 
     test('throws on missing env var by default', () => {
@@ -378,7 +379,7 @@ repos:
 fileName: config.json
 repos:
   - git: git@github.com:org/repo.git
-    json:
+    content:
       value: \${MISSING_VAR}
 `);
       assert.throws(() => loadConfig(path), /Missing required environment variable: MISSING_VAR/);
@@ -389,11 +390,11 @@ repos:
 fileName: config.json
 repos:
   - git: git@github.com:org/repo.git
-    json:
+    content:
       value: \${MISSING_VAR:-default-value}
 `);
       const config = loadConfig(path);
-      assert.deepEqual(config.repos[0].json, { value: 'default-value' });
+      assert.deepEqual(config.repos[0].content, { value: 'default-value' });
     });
   });
 
@@ -402,7 +403,7 @@ repos:
       const path = createTestConfig(`
 fileName: my.config.json
 mergeStrategy: replace
-json:
+content:
   version: "1.0"
   common: shared
   features:
@@ -411,12 +412,12 @@ repos:
   - git:
       - git@github.com:org/repo1.git
       - git@github.com:org/repo2.git
-    json:
+    content:
       team: platform
   - git: git@github.com:org/repo3.git
   - git: git@github.com:org/repo4.git
     override: true
-    json:
+    content:
       legacy: true
 `);
       const config = loadConfig(path);
@@ -426,7 +427,7 @@ repos:
 
       // Expanded array repos with merge
       assert.equal(config.repos[0].git, 'git@github.com:org/repo1.git');
-      assert.deepEqual(config.repos[0].json, {
+      assert.deepEqual(config.repos[0].content, {
         version: '1.0',
         common: 'shared',
         features: ['core'],
@@ -434,11 +435,11 @@ repos:
       });
 
       assert.equal(config.repos[1].git, 'git@github.com:org/repo2.git');
-      assert.deepEqual(config.repos[1].json, config.repos[0].json);
+      assert.deepEqual(config.repos[1].content, config.repos[0].content);
 
-      // Repo with no json - uses root json
+      // Repo with no content - uses root content
       assert.equal(config.repos[2].git, 'git@github.com:org/repo3.git');
-      assert.deepEqual(config.repos[2].json, {
+      assert.deepEqual(config.repos[2].content, {
         version: '1.0',
         common: 'shared',
         features: ['core'],
@@ -446,23 +447,52 @@ repos:
 
       // Repo with override
       assert.equal(config.repos[3].git, 'git@github.com:org/repo4.git');
-      assert.deepEqual(config.repos[3].json, { legacy: true });
+      assert.deepEqual(config.repos[3].content, { legacy: true });
     });
   });
 });
 
-describe('convertJsonToString', () => {
-  test('produces valid JSON', () => {
+describe('convertContentToString', () => {
+  test('produces valid JSON for .json files', () => {
     const input = { key: 'value', nested: { foo: 'bar' } };
-    const result = convertJsonToString(input);
+    const result = convertContentToString(input, 'config.json');
     const parsed = JSON.parse(result);
     assert.deepEqual(parsed, input);
   });
 
-  test('uses 2-space indentation', () => {
+  test('uses 2-space indentation for JSON', () => {
     const input = { key: 'value' };
-    const result = convertJsonToString(input);
+    const result = convertContentToString(input, 'config.json');
     assert.equal(result, '{\n  "key": "value"\n}');
+  });
+
+  test('produces valid YAML for .yaml files', () => {
+    const input = { key: 'value', nested: { foo: 'bar' } };
+    const result = convertContentToString(input, 'config.yaml');
+    const parsed = parse(result);
+    assert.deepEqual(parsed, input);
+  });
+
+  test('produces valid YAML for .yml files', () => {
+    const input = { key: 'value', nested: { foo: 'bar' } };
+    const result = convertContentToString(input, 'config.yml');
+    const parsed = parse(result);
+    assert.deepEqual(parsed, input);
+  });
+
+  test('defaults to JSON for unknown extensions', () => {
+    const input = { key: 'value' };
+    const result = convertContentToString(input, 'config.txt');
+    assert.equal(result, '{\n  "key": "value"\n}');
+  });
+
+  test('handles case-insensitive extensions', () => {
+    const input = { key: 'value' };
+    const resultYaml = convertContentToString(input, 'config.YAML');
+    const resultYml = convertContentToString(input, 'config.YML');
+    // Both should produce valid YAML (not starting with {)
+    assert.ok(!resultYaml.startsWith('{'));
+    assert.ok(!resultYml.startsWith('{'));
   });
 });
 
@@ -486,42 +516,42 @@ describe('Fixture-based tests', () => {
       const config = loadConfig(configPath);
       const expected = loadExpected('repo-array-1');
       assert.equal(config.repos[0].git, 'git@github.com:org/repo-array-1.git');
-      assert.deepEqual(config.repos[0].json, expected);
+      assert.deepEqual(config.repos[0].content, expected);
     });
 
-    test('repo-array-2: git array produces identical json', () => {
+    test('repo-array-2: git array produces identical content', () => {
       const config = loadConfig(configPath);
       const expected = loadExpected('repo-array-1'); // Same as repo-array-1
       assert.equal(config.repos[1].git, 'git@github.com:org/repo-array-2.git');
-      assert.deepEqual(config.repos[1].json, expected);
+      assert.deepEqual(config.repos[1].content, expected);
     });
 
-    test('repo-inherit: uses root json unchanged', () => {
+    test('repo-inherit: uses root content unchanged', () => {
       const config = loadConfig(configPath);
       const expected = loadExpected('repo-inherit');
       assert.equal(config.repos[2].git, 'git@github.com:org/repo-inherit.git');
-      assert.deepEqual(config.repos[2].json, expected);
+      assert.deepEqual(config.repos[2].content, expected);
     });
 
-    test('repo-override: ignores root json entirely', () => {
+    test('repo-override: ignores root content entirely', () => {
       const config = loadConfig(configPath);
       const expected = loadExpected('repo-override');
       assert.equal(config.repos[3].git, 'git@github.com:org/repo-override.git');
-      assert.deepEqual(config.repos[3].json, expected);
+      assert.deepEqual(config.repos[3].content, expected);
     });
 
     test('repo-append: $arrayMerge append works', () => {
       const config = loadConfig(configPath);
       const expected = loadExpected('repo-append');
       assert.equal(config.repos[4].git, 'git@github.com:org/repo-append.git');
-      assert.deepEqual(config.repos[4].json, expected);
+      assert.deepEqual(config.repos[4].content, expected);
     });
 
     test('repo-prepend: $arrayMerge prepend works', () => {
       const config = loadConfig(configPath);
       const expected = loadExpected('repo-prepend');
       assert.equal(config.repos[5].git, 'git@github.com:org/repo-prepend.git');
-      assert.deepEqual(config.repos[5].json, expected);
+      assert.deepEqual(config.repos[5].content, expected);
     });
   });
 
@@ -532,7 +562,7 @@ describe('Fixture-based tests', () => {
       const config = loadConfig(configPath);
       const expected = loadExpected('repo-global-append');
       assert.equal(config.repos[0].git, 'git@github.com:org/repo-global-append.git');
-      assert.deepEqual(config.repos[0].json, expected);
+      assert.deepEqual(config.repos[0].content, expected);
     });
   });
 
@@ -553,7 +583,7 @@ describe('Fixture-based tests', () => {
       const config = loadConfig(configPath);
       const expected = loadExpected('repo-env');
       assert.equal(config.repos[0].git, 'git@github.com:org/repo-env.git');
-      assert.deepEqual(config.repos[0].json, expected);
+      assert.deepEqual(config.repos[0].content, expected);
     });
 
     test('throws when required env var missing', () => {
@@ -573,21 +603,21 @@ describe('Fixture-based tests', () => {
       assert.equal(config.repos.length, 3);
     });
 
-    test('first repo has merged json with array replaced', () => {
+    test('first repo has merged content with array replaced', () => {
       const config = loadConfig(configPath);
       const expectedPath = join(fixturesDir, 'test-repo-output.json');
       const expected = JSON.parse(readFileSync(expectedPath, 'utf-8'));
-      assert.deepEqual(config.repos[0].json, expected);
+      assert.deepEqual(config.repos[0].content, expected);
     });
 
-    test('second repo has same json as first', () => {
+    test('second repo has same content as first', () => {
       const config = loadConfig(configPath);
-      assert.deepEqual(config.repos[0].json, config.repos[1].json);
+      assert.deepEqual(config.repos[0].content, config.repos[1].content);
     });
 
     test('third repo has different overlay', () => {
       const config = loadConfig(configPath);
-      assert.deepEqual(config.repos[2].json.prop4, {
+      assert.deepEqual(config.repos[2].content.prop4, {
         prop5: [{ prop6: 'data' }],
       });
     });

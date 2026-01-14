@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Overview
 
-TypeScript CLI tool that syncs JSON configuration files across multiple Git repositories by automatically creating pull requests. Supports both GitHub and Azure DevOps platforms.
+TypeScript CLI tool that syncs JSON or YAML configuration files across multiple Git repositories by automatically creating pull requests. Output format is automatically detected from the target filename extension (`.json` → JSON, `.yaml`/`.yml` → YAML). Supports both GitHub and Azure DevOps platforms.
 
 ## Architecture
 
@@ -18,12 +18,12 @@ Raw YAML → Parse → Validate → Expand git arrays → Deep merge → Env int
 
 **Types**:
 - `RawConfig` / `RawRepoConfig`: As parsed from YAML (flexible input format)
-- `Config` / `RepoConfig`: Normalized output (each entry has single git URL + merged JSON)
+- `Config` / `RepoConfig`: Normalized output (each entry has single git URL + merged content)
 
 **Pipeline Steps**:
 1. **Validation**: Check required fields, validate git URLs exist
 2. **Git Array Expansion**: `git: [url1, url2]` becomes two separate repo entries
-3. **JSON Merge**: Per-repo `json` overlays onto root-level `json` using deep merge
+3. **Content Merge**: Per-repo `content` overlays onto root-level `content` using deep merge
 4. **Env Interpolation**: Replace `${VAR}` placeholders with environment values
 
 ### Deep Merge (merge.ts)
@@ -46,7 +46,7 @@ Recursive object merging with configurable array handling:
 
 ### Environment Interpolation (env.ts)
 
-Replaces environment variable placeholders in JSON string values:
+Replaces environment variable placeholders in string values:
 
 **Supported Syntax**:
 - `${VAR}`: Required variable (errors if missing in strict mode)
@@ -64,7 +64,7 @@ The tool processes repositories sequentially with a 9-step workflow per repo:
 2. Clone repository
 3. Detect default branch (main/master)
 4. Create/checkout sync branch (`chore/sync-{sanitized-filename}`)
-5. Write JSON file from config
+5. Write config file (JSON or YAML based on filename extension)
 6. Check for changes (skip if none)
 7. Commit changes
 8. Push to remote
@@ -110,10 +110,10 @@ Returns `RepoInfo` with normalized fields (owner, repo, organization, project) u
 
 YAML structure with inheritance:
 ```yaml
-fileName: my.config.json     # Target file to create in each repo
+fileName: my.config.json     # Target file (.json → JSON, .yaml/.yml → YAML output)
 mergeStrategy: replace       # Default array merge: replace | append | prepend
 
-json:                        # Base JSON config (inherited by all repos)
+content:                     # Base config (inherited by all repos)
   key: value
   features:
     - core
@@ -122,19 +122,19 @@ repos:
   - git:                     # Can be string or array of strings
       - git@github.com:org/repo1.git
       - git@github.com:org/repo2.git
-    json:                    # Overlay merged onto base json
+    content:                 # Overlay merged onto base content
       key: override
       features:
         $arrayMerge: append  # Use append for this array
         values:
           - custom
   - git: git@github.com:org/repo3.git
-    override: true           # Skip merging, use only this json
-    json:
+    override: true           # Skip merging, use only this content
+    content:
       different: config
 ```
 
-JSON formatting: Always uses 2-space indentation via `JSON.stringify(json, null, 2)` plus trailing newline.
+Output formatting: JSON uses 2-space indentation via `JSON.stringify()`. YAML uses 2-space indentation via the `yaml` package's `stringify()`. Trailing newline is always added.
 
 ## Development Commands
 

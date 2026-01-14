@@ -1,7 +1,7 @@
 # Fixture testing environment variable interpolation
 fileName: env.config.json
 
-json:
+content:
   database:
     host: ${DB_HOST:-localhost}
     port: ${DB_PORT:-5432}
@@ -11,5 +11,5 @@ json:
 
 repos:
   - git: git@github.com:org/repo-env.git
-    json:
+    content:
       serviceName: ${SERVICE_NAME:-default-service}

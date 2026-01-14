@@ -1,5 +1,5 @@
 fileName: my.config.json
-json:
+content:
   prop1: main
   prop2:
     prop3: MyService
@@ -11,12 +11,12 @@ repos:
   - git:
       - git@github.com:example-org/example-repo-1.git
       - git@github.com:example-org/example-repo-2.git
-    json:
+    content:
       prop4:
         prop5:
           - prop6: product
   - git: git@github.com:example-org/example-repo-3.git
-    json:
+    content:
       prop4:
         prop5:
           - prop6: data

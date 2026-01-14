@@ -2,7 +2,7 @@
 fileName: global-merge.config.json
 mergeStrategy: append
 
-json:
+content:
   features:
     - base-feature-1
     - base-feature-2
@@ -11,7 +11,7 @@ json:
 
 repos:
   - git: git@github.com:org/repo-global-append.git
-    json:
+    content:
       features:
         - added-feature
       tags:

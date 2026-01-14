@@ -2,7 +2,7 @@
 fileName: service.config.json
 mergeStrategy: replace
 
-json:
+content:
   version: "2.0"
   environment: production
   logging:
@@ -19,24 +19,24 @@ repos:
   - git:
       - git@github.com:org/repo-array-1.git
       - git@github.com:org/repo-array-2.git
-    json:
+    content:
       team: platform
       logging:
         level: debug
 
-  # Test 2: No json - inherits root json exactly
+  # Test 2: No content - inherits root content exactly
   - git: git@github.com:org/repo-inherit.git
 
-  # Test 3: Override - ignores root json entirely
+  # Test 3: Override - ignores root content entirely
   - git: git@github.com:org/repo-override.git
     override: true
-    json:
+    content:
       version: "1.0"
       legacy: true
 
   # Test 4: Array merge with $arrayMerge: append
   - git: git@github.com:org/repo-append.git
-    json:
+    content:
       features:
         $arrayMerge: append
         values:
@@ -48,7 +48,7 @@ repos:
 
   # Test 5: Array merge with $arrayMerge: prepend
   - git: git@github.com:org/repo-prepend.git
-    json:
+    content:
       features:
         $arrayMerge: prepend
         values:

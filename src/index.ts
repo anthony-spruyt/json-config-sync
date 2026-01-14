@@ -3,7 +3,7 @@
 import { program } from 'commander';
 import { resolve, join } from 'node:path';
 import { existsSync } from 'node:fs';
-import { loadConfig, convertJsonToString } from './config.js';
+import { loadConfig, convertContentToString } from './config.js';
 import { parseGitUrl, getRepoDisplayName } from './repo-detector.js';
 import { GitOps, sanitizeBranchName } from './git-ops.js';
 import { createPR } from './pr-creator.js';
@@ -84,10 +84,10 @@ async function main(): Promise<void> {
       logger.info(`Switching to branch: ${branchName}`);
       gitOps.createBranch(branchName);
 
-      // Step 5: Write JSON file
+      // Step 5: Write config file
       logger.info(`Writing ${config.fileName}...`);
-      const jsonContent = convertJsonToString(repoConfig.json);
-      gitOps.writeFile(config.fileName, jsonContent);
+      const fileContent = convertContentToString(repoConfig.content, config.fileName);
+      gitOps.writeFile(config.fileName, fileContent);
 
       // Step 6: Check for changes
       if (!gitOps.hasChanges()) {
