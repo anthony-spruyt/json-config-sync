@@ -1,7 +1,13 @@
-import { execSync } from 'node:child_process';
-import { rmSync, existsSync, mkdirSync, writeFileSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
-import { escapeShellArg } from './shell-utils.js';
+import { execSync } from "node:child_process";
+import {
+  rmSync,
+  existsSync,
+  mkdirSync,
+  writeFileSync,
+  readFileSync,
+} from "node:fs";
+import { join } from "node:path";
+import { escapeShellArg } from "./shell-utils.js";
 
 export interface GitOpsOptions {
   workDir: string;
@@ -20,8 +26,8 @@ export class GitOps {
   private exec(command: string, cwd?: string): string {
     return execSync(command, {
       cwd: cwd ?? this.workDir,
-      encoding: 'utf-8',
-      stdio: ['pipe', 'pipe', 'pipe'],
+      encoding: "utf-8",
+      stdio: ["pipe", "pipe", "pipe"],
     }).trim();
   }
 
@@ -52,7 +58,7 @@ export class GitOps {
       return;
     }
     const filePath = join(this.workDir, fileName);
-    writeFileSync(filePath, content + '\n', 'utf-8');
+    writeFileSync(filePath, content + "\n", "utf-8");
   }
 
   /**
@@ -61,7 +67,7 @@ export class GitOps {
    */
   wouldChange(fileName: string, content: string): boolean {
     const filePath = join(this.workDir, fileName);
-    const newContent = content + '\n';
+    const newContent = content + "\n";
 
     if (!existsSync(filePath)) {
       // File doesn't exist, so writing it would be a change
@@ -69,7 +75,7 @@ export class GitOps {
     }
 
     try {
-      const existingContent = readFileSync(filePath, 'utf-8');
+      const existingContent = readFileSync(filePath, "utf-8");
       return existingContent !== newContent;
     } catch {
       // If we can't read the file, assume it would change
@@ -78,7 +84,7 @@ export class GitOps {
   }
 
   hasChanges(): boolean {
-    const status = this.exec('git status --porcelain', this.workDir);
+    const status = this.exec("git status --porcelain", this.workDir);
     return status.length > 0;
   }
 
@@ -86,7 +92,7 @@ export class GitOps {
     if (this.dryRun) {
       return;
     }
-    this.exec('git add -A', this.workDir);
+    this.exec("git add -A", this.workDir);
     this.exec(`git commit -m ${escapeShellArg(message)}`, this.workDir);
   }
 
@@ -100,10 +106,10 @@ export class GitOps {
   getDefaultBranch(): { branch: string; method: string } {
     try {
       // Try to get the default branch from remote
-      const remoteInfo = this.exec('git remote show origin', this.workDir);
+      const remoteInfo = this.exec("git remote show origin", this.workDir);
       const match = remoteInfo.match(/HEAD branch: (\S+)/);
       if (match) {
-        return { branch: match[1], method: 'remote HEAD' };
+        return { branch: match[1], method: "remote HEAD" };
       }
     } catch {
       // Fallback methods
@@ -111,28 +117,28 @@ export class GitOps {
 
     // Try common default branch names
     try {
-      this.exec('git rev-parse --verify origin/main', this.workDir);
-      return { branch: 'main', method: 'origin/main exists' };
+      this.exec("git rev-parse --verify origin/main", this.workDir);
+      return { branch: "main", method: "origin/main exists" };
     } catch {
       // Try master
     }
 
     try {
-      this.exec('git rev-parse --verify origin/master', this.workDir);
-      return { branch: 'master', method: 'origin/master exists' };
+      this.exec("git rev-parse --verify origin/master", this.workDir);
+      return { branch: "master", method: "origin/master exists" };
     } catch {
       // Default to main
     }
 
-    return { branch: 'main', method: 'fallback default' };
+    return { branch: "main", method: "fallback default" };
   }
 }
 
 export function sanitizeBranchName(fileName: string): string {
   return fileName
     .toLowerCase()
-    .replace(/\.[^.]+$/, '') // Remove extension
-    .replace(/[^a-z0-9-]/g, '-') // Replace non-alphanumeric with dashes
-    .replace(/-+/g, '-') // Collapse multiple dashes
-    .replace(/^-|-$/g, ''); // Remove leading/trailing dashes
+    .replace(/\.[^.]+$/, "") // Remove extension
+    .replace(/[^a-z0-9-]/g, "-") // Replace non-alphanumeric with dashes
+    .replace(/-+/g, "-") // Collapse multiple dashes
+    .replace(/^-|-$/g, ""); // Remove leading/trailing dashes
 }

@@ -17,10 +17,12 @@ Raw YAML → Parse → Validate → Expand git arrays → Deep merge → Env int
 ```
 
 **Types**:
+
 - `RawConfig` / `RawRepoConfig`: As parsed from YAML (flexible input format)
 - `Config` / `RepoConfig`: Normalized output (each entry has single git URL + merged content)
 
 **Pipeline Steps**:
+
 1. **Validation**: Check required fields, validate git URLs exist
 2. **Git Array Expansion**: `git: [url1, url2]` becomes two separate repo entries
 3. **Content Merge**: Per-repo `content` overlays onto root-level `content` using deep merge
@@ -31,16 +33,19 @@ Raw YAML → Parse → Validate → Expand git arrays → Deep merge → Env int
 Recursive object merging with configurable array handling:
 
 **Key Functions**:
+
 - `deepMerge(base, overlay, ctx)`: Merge two objects, overlay wins for conflicts
 - `stripMergeDirectives(obj)`: Remove `$`-prefixed keys from output
 - `createMergeContext(strategy)`: Create context with default array strategy
 
 **Array Merge Strategies**:
+
 - `replace` (default): Overlay array replaces base array
 - `append`: Overlay array concatenated after base array
 - `prepend`: Overlay array concatenated before base array
 
 **Merge Directives**:
+
 - `$arrayMerge`: Set strategy for child arrays in that object
 - Directive keys stripped from final output
 
@@ -49,17 +54,20 @@ Recursive object merging with configurable array handling:
 Replaces environment variable placeholders in string values:
 
 **Supported Syntax**:
+
 - `${VAR}`: Required variable (errors if missing in strict mode)
 - `${VAR:-default}`: Use default if variable is not set
 - `${VAR:?message}`: Required with custom error message
 
 **Options**:
+
 - `strict: true` (default): Throw on missing required variables
 - `strict: false`: Leave placeholders as-is if missing
 
 ### Orchestration Flow (index.ts)
 
 The tool processes repositories sequentially with a 9-step workflow per repo:
+
 1. Clean workspace (remove old clones)
 2. Clone repository
 3. Detect default branch (main/master)
@@ -75,6 +83,7 @@ The tool processes repositories sequentially with a 9-step workflow per repo:
 ### Platform Detection (repo-detector.ts)
 
 Auto-detects GitHub vs Azure DevOps from git URL patterns:
+
 - GitHub SSH: `git@github.com:owner/repo.git`
 - GitHub HTTPS: `https://github.com/owner/repo.git`
 - Azure SSH: `git@ssh.dev.azure.com:v3/org/project/repo`
@@ -93,12 +102,14 @@ Returns `RepoInfo` with normalized fields (owner, repo, organization, project) u
 ### Git Operations (git-ops.ts)
 
 **Branch Strategy**:
+
 - Sanitizes filename for branch name (removes extension, lowercase, alphanumeric+dashes only)
 - Checks if branch exists on remote first (`git fetch origin <branch>`)
 - Reuses existing branch if found, otherwise creates new one
 - This allows updates to existing PRs instead of creating duplicates
 
 **Default Branch Detection**: Tries multiple methods in order:
+
 1. `git remote show origin` (parse HEAD branch)
 2. Check if `origin/main` exists
 3. Check if `origin/master` exists
@@ -109,27 +120,28 @@ Returns `RepoInfo` with normalized fields (owner, repo, organization, project) u
 ## Configuration Format
 
 YAML structure with inheritance:
-```yaml
-fileName: my.config.json     # Target file (.json → JSON, .yaml/.yml → YAML output)
-mergeStrategy: replace       # Default array merge: replace | append | prepend
 
-content:                     # Base config (inherited by all repos)
+```yaml
+fileName: my.config.json # Target file (.json → JSON, .yaml/.yml → YAML output)
+mergeStrategy: replace # Default array merge: replace | append | prepend
+
+content: # Base config (inherited by all repos)
   key: value
   features:
     - core
 
 repos:
-  - git:                     # Can be string or array of strings
+  - git: # Can be string or array of strings
       - git@github.com:org/repo1.git
       - git@github.com:org/repo2.git
-    content:                 # Overlay merged onto base content
+    content: # Overlay merged onto base content
       key: override
       features:
-        $arrayMerge: append  # Use append for this array
+        $arrayMerge: append # Use append for this array
         values:
           - custom
   - git: git@github.com:org/repo3.git
-    override: true           # Skip merging, use only this content
+    override: true # Skip merging, use only this content
     content:
       different: config
 ```
@@ -172,6 +184,7 @@ git push origin vX.Y.Z
 ```
 
 The `release.yml` workflow automatically:
+
 - Builds and tests
 - Publishes to npm with provenance
 - Creates a GitHub Release with auto-generated notes
@@ -181,12 +194,14 @@ The `release.yml` workflow automatically:
 ## External Dependencies
 
 **Required**:
+
 - Node.js >= 18
 - `git` CLI (for cloning/pushing)
 - `gh` CLI (for GitHub repos) - must be authenticated via `gh auth login`
 - `az` CLI (for Azure DevOps repos) - must be authenticated and configured
 
 **Package Structure**:
+
 - Published as ESM (`"type": "module"`)
 - Uses `.js` extensions in imports (TypeScript requirement for NodeNext)
 - Binary entry point: `dist/index.js` (has shebang)
@@ -194,6 +209,7 @@ The `release.yml` workflow automatically:
 ## Testing Approach
 
 **Unit Tests**: Modular test files per module:
+
 - `config.test.ts`: Config validation, normalization, integration
 - `merge.test.ts`: Deep merge logic, array strategies, directives
 - `env.test.ts`: Environment variable interpolation
@@ -201,6 +217,7 @@ The `release.yml` workflow automatically:
 Use fixtures in `fixtures/` directory.
 
 **Integration Tests**: End-to-end test that:
+
 1. Sets up clean state in test repo
 2. Runs CLI with `fixtures/integration-test-config.yaml`
 3. Verifies PR creation via `gh` CLI

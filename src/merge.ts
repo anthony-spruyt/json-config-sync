@@ -3,7 +3,7 @@
  * Supports configurable array merge strategies via $arrayMerge directive.
  */
 
-export type ArrayMergeStrategy = 'replace' | 'append' | 'prepend';
+export type ArrayMergeStrategy = "replace" | "append" | "prepend";
 
 export interface MergeContext {
   arrayStrategies: Map<string, ArrayMergeStrategy>;
@@ -14,7 +14,7 @@ export interface MergeContext {
  * Check if a value is a plain object (not null, not array).
  */
 function isPlainObject(val: unknown): val is Record<string, unknown> {
-  return typeof val === 'object' && val !== null && !Array.isArray(val);
+  return typeof val === "object" && val !== null && !Array.isArray(val);
 }
 
 /**
@@ -23,14 +23,14 @@ function isPlainObject(val: unknown): val is Record<string, unknown> {
 function mergeArrays(
   base: unknown[],
   overlay: unknown[],
-  strategy: ArrayMergeStrategy
+  strategy: ArrayMergeStrategy,
 ): unknown[] {
   switch (strategy) {
-    case 'replace':
+    case "replace":
       return overlay;
-    case 'append':
+    case "append":
       return [...base, ...overlay];
-    case 'prepend':
+    case "prepend":
       return [...overlay, ...base];
     default:
       return overlay;
@@ -48,7 +48,7 @@ function extractArrayFromOverlay(overlay: unknown): unknown[] | null {
     return overlay;
   }
 
-  if (isPlainObject(overlay) && 'values' in overlay) {
+  if (isPlainObject(overlay) && "values" in overlay) {
     const values = overlay.values;
     if (Array.isArray(values)) {
       return values;
@@ -62,12 +62,12 @@ function extractArrayFromOverlay(overlay: unknown): unknown[] | null {
  * Get merge strategy from an overlay object's $arrayMerge directive.
  */
 function getStrategyFromOverlay(overlay: unknown): ArrayMergeStrategy | null {
-  if (isPlainObject(overlay) && '$arrayMerge' in overlay) {
+  if (isPlainObject(overlay) && "$arrayMerge" in overlay) {
     const strategy = overlay.$arrayMerge;
     if (
-      strategy === 'replace' ||
-      strategy === 'append' ||
-      strategy === 'prepend'
+      strategy === "replace" ||
+      strategy === "append" ||
+      strategy === "prepend"
     ) {
       return strategy;
     }
@@ -87,7 +87,7 @@ export function deepMerge(
   base: Record<string, unknown>,
   overlay: Record<string, unknown>,
   ctx: MergeContext,
-  path: string = ''
+  path: string = "",
 ): Record<string, unknown> {
   const result: Record<string, unknown> = { ...base };
 
@@ -96,13 +96,13 @@ export function deepMerge(
 
   for (const [key, overlayValue] of Object.entries(overlay)) {
     // Skip directive keys in output
-    if (key.startsWith('$')) continue;
+    if (key.startsWith("$")) continue;
 
     const currentPath = path ? `${path}.${key}` : key;
     const baseValue = base[key];
 
     // If overlay is an object with $arrayMerge directive for an array field
-    if (isPlainObject(overlayValue) && '$arrayMerge' in overlayValue) {
+    if (isPlainObject(overlayValue) && "$arrayMerge" in overlayValue) {
       const strategy = getStrategyFromOverlay(overlayValue);
       const overlayArray = extractArrayFromOverlay(overlayValue);
 
@@ -126,13 +126,15 @@ export function deepMerge(
     // Both are plain objects - recurse
     if (isPlainObject(baseValue) && isPlainObject(overlayValue)) {
       // Extract $arrayMerge for child paths if present
-      if ('$arrayMerge' in overlayValue) {
+      if ("$arrayMerge" in overlayValue) {
         const childStrategy = getStrategyFromOverlay(overlayValue);
         if (childStrategy) {
           // Apply to all immediate child arrays
           for (const childKey of Object.keys(overlayValue)) {
-            if (!childKey.startsWith('$')) {
-              const childPath = currentPath ? `${currentPath}.${childKey}` : childKey;
+            if (!childKey.startsWith("$")) {
+              const childPath = currentPath
+                ? `${currentPath}.${childKey}`
+                : childKey;
               ctx.arrayStrategies.set(childPath, childStrategy);
             }
           }
@@ -154,19 +156,19 @@ export function deepMerge(
  * Works recursively on nested objects and arrays.
  */
 export function stripMergeDirectives(
-  obj: Record<string, unknown>
+  obj: Record<string, unknown>,
 ): Record<string, unknown> {
   const result: Record<string, unknown> = {};
 
   for (const [key, value] of Object.entries(obj)) {
     // Skip all $-prefixed keys (reserved for directives)
-    if (key.startsWith('$')) continue;
+    if (key.startsWith("$")) continue;
 
     if (isPlainObject(value)) {
       result[key] = stripMergeDirectives(value);
     } else if (Array.isArray(value)) {
       result[key] = value.map((item) =>
-        isPlainObject(item) ? stripMergeDirectives(item) : item
+        isPlainObject(item) ? stripMergeDirectives(item) : item,
       );
     } else {
       result[key] = value;
@@ -180,7 +182,7 @@ export function stripMergeDirectives(
  * Create a default merge context.
  */
 export function createMergeContext(
-  defaultStrategy: ArrayMergeStrategy = 'replace'
+  defaultStrategy: ArrayMergeStrategy = "replace",
 ): MergeContext {
   return {
     arrayStrategies: new Map(),

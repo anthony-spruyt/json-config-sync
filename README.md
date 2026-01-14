@@ -137,36 +137,36 @@ json-config-sync --config ./config.yaml --work-dir ./my-temp
 ### Basic Structure
 
 ```yaml
-fileName: my.config.json      # Target file (.json outputs JSON, .yaml/.yml outputs YAML)
-mergeStrategy: replace        # Default array merge strategy (optional)
+fileName: my.config.json # Target file (.json outputs JSON, .yaml/.yml outputs YAML)
+mergeStrategy: replace # Default array merge strategy (optional)
 
-content:                      # Base config content (optional)
+content: # Base config content (optional)
   key: value
 
-repos:                        # List of repositories
+repos: # List of repositories
   - git: git@github.com:org/repo.git
-    content:                  # Per-repo overlay (optional if base content exists)
+    content: # Per-repo overlay (optional if base content exists)
       key: override
 ```
 
 ### Root-Level Fields
 
-| Field           | Description                                                           | Required |
-| --------------- | --------------------------------------------------------------------- | -------- |
-| `fileName`      | Target file name (`.json` → JSON output, `.yaml`/`.yml` → YAML output)| Yes      |
-| `content`       | Base config inherited by all repos                                    | No*      |
-| `mergeStrategy` | Default array merge strategy: `replace`, `append`, `prepend`          | No       |
-| `repos`         | Array of repository configurations                                    | Yes      |
+| Field           | Description                                                            | Required |
+| --------------- | ---------------------------------------------------------------------- | -------- |
+| `fileName`      | Target file name (`.json` → JSON output, `.yaml`/`.yml` → YAML output) | Yes      |
+| `content`       | Base config inherited by all repos                                     | No\*     |
+| `mergeStrategy` | Default array merge strategy: `replace`, `append`, `prepend`           | No       |
+| `repos`         | Array of repository configurations                                     | Yes      |
 
 \* Required if any repo entry omits the `content` field.
 
 ### Per-Repo Fields
 
-| Field      | Description                                               | Required |
-| ---------- | --------------------------------------------------------- | -------- |
-| `git`      | Git URL (string) or array of URLs                         | Yes      |
-| `content`  | Content overlay merged onto base (optional if base exists)| No*      |
-| `override` | If `true`, ignore base content and use only this repo's   | No       |
+| Field      | Description                                                | Required |
+| ---------- | ---------------------------------------------------------- | -------- |
+| `git`      | Git URL (string) or array of URLs                          | Yes      |
+| `content`  | Content overlay merged onto base (optional if base exists) | No\*     |
+| `override` | If `true`, ignore base content and use only this repo's    | No       |
 
 \* Required if no root-level `content` is defined.
 
@@ -176,8 +176,8 @@ Use `${VAR}` syntax in string values:
 
 ```yaml
 content:
-  apiUrl: ${API_URL}                    # Required - errors if not set
-  environment: ${ENV:-development}      # With default value
+  apiUrl: ${API_URL} # Required - errors if not set
+  environment: ${ENV:-development} # With default value
   secretKey: ${SECRET:?Secret required} # Required with custom error message
 ```
 
@@ -195,9 +195,9 @@ repos:
   - git: git@github.com:org/repo.git
     content:
       features:
-        $arrayMerge: append  # append | prepend | replace
+        $arrayMerge: append # append | prepend | replace
         values:
-          - custom-feature   # Results in: [core, monitoring, custom-feature]
+          - custom-feature # Results in: [core, monitoring, custom-feature]
 ```
 
 ## Examples
@@ -527,7 +527,10 @@ repos:
 ```json
 {
   "yaml.schemas": {
-    "https://raw.githubusercontent.com/anthony-spruyt/json-config-sync/main/config-schema.json": ["**/sync-config.yaml", "**/config-sync.yaml"]
+    "https://raw.githubusercontent.com/anthony-spruyt/json-config-sync/main/config-schema.json": [
+      "**/sync-config.yaml",
+      "**/config-sync.yaml"
+    ]
   }
 }
 ```

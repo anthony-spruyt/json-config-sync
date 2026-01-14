@@ -1,12 +1,12 @@
-import { readFileSync } from 'node:fs';
-import { parse, stringify } from 'yaml';
+import { readFileSync } from "node:fs";
+import { parse, stringify } from "yaml";
 import {
   deepMerge,
   stripMergeDirectives,
   createMergeContext,
   type ArrayMergeStrategy,
-} from './merge.js';
-import { interpolateEnvVars } from './env.js';
+} from "./merge.js";
+import { interpolateEnvVars } from "./env.js";
 
 // =============================================================================
 // Raw Config Types (as parsed from YAML)
@@ -45,11 +45,11 @@ export interface Config {
 
 function validateRawConfig(config: RawConfig): void {
   if (!config.fileName) {
-    throw new Error('Config missing required field: fileName');
+    throw new Error("Config missing required field: fileName");
   }
 
   if (!config.repos || !Array.isArray(config.repos)) {
-    throw new Error('Config missing required field: repos (must be an array)');
+    throw new Error("Config missing required field: repos (must be an array)");
   }
 
   const hasRootContent = config.content !== undefined;
@@ -60,17 +60,21 @@ function validateRawConfig(config: RawConfig): void {
       throw new Error(`Repo at index ${i} missing required field: git`);
     }
     if (!hasRootContent && !repo.content) {
-      throw new Error(`Repo at index ${i} missing required field: content (no root-level content defined)`);
+      throw new Error(
+        `Repo at index ${i} missing required field: content (no root-level content defined)`,
+      );
     }
     if (repo.override && !repo.content) {
-      throw new Error(`Repo ${getGitDisplayName(repo.git)} has override: true but no content defined`);
+      throw new Error(
+        `Repo ${getGitDisplayName(repo.git)} has override: true but no content defined`,
+      );
     }
   }
 }
 
 function getGitDisplayName(git: string | string[]): string {
   if (Array.isArray(git)) {
-    return git[0] || 'unknown';
+    return git[0] || "unknown";
   }
   return git;
 }
@@ -81,7 +85,7 @@ function getGitDisplayName(git: string | string[]): string {
 
 function normalizeConfig(raw: RawConfig): Config {
   const baseContent = raw.content ?? {};
-  const defaultStrategy = raw.mergeStrategy ?? 'replace';
+  const defaultStrategy = raw.mergeStrategy ?? "replace";
   const expandedRepos: RepoConfig[] = [];
 
   for (const rawRepo of raw.repos) {
@@ -95,7 +99,7 @@ function normalizeConfig(raw: RawConfig): Config {
       if (rawRepo.override) {
         // Override mode: use only repo content
         mergedContent = stripMergeDirectives(
-          structuredClone(rawRepo.content as Record<string, unknown>)
+          structuredClone(rawRepo.content as Record<string, unknown>),
         );
       } else if (!rawRepo.content) {
         // No repo content: use root content as-is
@@ -106,7 +110,7 @@ function normalizeConfig(raw: RawConfig): Config {
         mergedContent = deepMerge(
           structuredClone(baseContent),
           rawRepo.content,
-          ctx
+          ctx,
         );
         mergedContent = stripMergeDirectives(mergedContent);
       }
@@ -132,7 +136,7 @@ function normalizeConfig(raw: RawConfig): Config {
 // =============================================================================
 
 export function loadConfig(filePath: string): Config {
-  const content = readFileSync(filePath, 'utf-8');
+  const content = readFileSync(filePath, "utf-8");
   const rawConfig = parse(content) as RawConfig;
 
   validateRawConfig(rawConfig);
@@ -140,23 +144,23 @@ export function loadConfig(filePath: string): Config {
   return normalizeConfig(rawConfig);
 }
 
-type OutputFormat = 'json' | 'yaml';
+type OutputFormat = "json" | "yaml";
 
 function detectOutputFormat(fileName: string): OutputFormat {
-  const ext = fileName.toLowerCase().split('.').pop();
-  if (ext === 'yaml' || ext === 'yml') {
-    return 'yaml';
+  const ext = fileName.toLowerCase().split(".").pop();
+  if (ext === "yaml" || ext === "yml") {
+    return "yaml";
   }
-  return 'json';
+  return "json";
 }
 
 export function convertContentToString(
   content: Record<string, unknown>,
-  fileName: string
+  fileName: string,
 ): string {
   const format = detectOutputFormat(fileName);
 
-  if (format === 'yaml') {
+  if (format === "yaml") {
     return stringify(content, { indent: 2 });
   }
 

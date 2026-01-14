@@ -33,7 +33,7 @@ const ENV_VAR_REGEX = /\$\{([^}:]+)(?::([?-])([^}]*))?\}/g;
  * Check if a value is a plain object (not null, not array).
  */
 function isPlainObject(val: unknown): val is Record<string, unknown> {
-  return typeof val === 'object' && val !== null && !Array.isArray(val);
+  return typeof val === "object" && val !== null && !Array.isArray(val);
 }
 
 /**
@@ -41,7 +41,7 @@ function isPlainObject(val: unknown): val is Record<string, unknown> {
  */
 function processString(
   value: string,
-  options: EnvInterpolationOptions
+  options: EnvInterpolationOptions,
 ): string {
   return value.replace(
     ENV_VAR_REGEX,
@@ -54,12 +54,12 @@ function processString(
       }
 
       // Has default value (:-default)
-      if (modifier === '-') {
-        return defaultOrMsg ?? '';
+      if (modifier === "-") {
+        return defaultOrMsg ?? "";
       }
 
       // Required with message (:?message)
-      if (modifier === '?') {
+      if (modifier === "?") {
         const message = defaultOrMsg || `is required`;
         throw new Error(`${varName}: ${message}`);
       }
@@ -71,7 +71,7 @@ function processString(
 
       // Non-strict mode - leave placeholder as-is
       return match;
-    }
+    },
   );
 }
 
@@ -80,9 +80,9 @@ function processString(
  */
 function processValue(
   value: unknown,
-  options: EnvInterpolationOptions
+  options: EnvInterpolationOptions,
 ): unknown {
-  if (typeof value === 'string') {
+  if (typeof value === "string") {
     return processString(value, options);
   }
 
@@ -116,7 +116,7 @@ function processValue(
  */
 export function interpolateEnvVars(
   json: Record<string, unknown>,
-  options: EnvInterpolationOptions = DEFAULT_OPTIONS
+  options: EnvInterpolationOptions = DEFAULT_OPTIONS,
 ): Record<string, unknown> {
   return processValue(json, options) as Record<string, unknown>;
 }

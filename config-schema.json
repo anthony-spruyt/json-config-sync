@@ -14,7 +14,7 @@
       "type": "string",
       "enum": ["replace", "append", "prepend"],
       "default": "replace",
-      "description": "Default array merge strategy for all repos. 'replace' replaces arrays, 'append' adds overlay after base, 'prepend' adds overlay before base"
+      "description": "Default array merge strategy for all repos. 'replace' replaces arrays, 'append' adds overlay after base, 'prepend' adds overlay before base. Default: replace"
     },
     "content": {
       "type": "object",
@@ -61,7 +61,7 @@
         "override": {
           "type": "boolean",
           "default": false,
-          "description": "If true, use only this repo's content and skip merging with base content"
+          "description": "If true, use only this repo's content and skip merging with base content. Default: false"
         }
       }
     }

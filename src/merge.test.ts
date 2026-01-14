@@ -1,14 +1,14 @@
-import { test, describe } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { test, describe } from "node:test";
+import { strict as assert } from "node:assert";
 import {
   deepMerge,
   stripMergeDirectives,
   type ArrayMergeStrategy,
   type MergeContext,
-} from './merge.js';
+} from "./merge.js";
 
 function createContext(
-  defaultStrategy: ArrayMergeStrategy = 'replace'
+  defaultStrategy: ArrayMergeStrategy = "replace",
 ): MergeContext {
   return {
     arrayStrategies: new Map(),
@@ -16,98 +16,98 @@ function createContext(
   };
 }
 
-describe('deepMerge', () => {
-  test('returns overlay when base is empty', () => {
+describe("deepMerge", () => {
+  test("returns overlay when base is empty", () => {
     const base = {};
-    const overlay = { key: 'value' };
+    const overlay = { key: "value" };
     const result = deepMerge(base, overlay, createContext());
-    assert.deepEqual(result, { key: 'value' });
+    assert.deepEqual(result, { key: "value" });
   });
 
-  test('returns base when overlay is empty', () => {
-    const base = { key: 'value' };
+  test("returns base when overlay is empty", () => {
+    const base = { key: "value" };
     const overlay = {};
     const result = deepMerge(base, overlay, createContext());
-    assert.deepEqual(result, { key: 'value' });
+    assert.deepEqual(result, { key: "value" });
   });
 
-  test('overlay scalar overwrites base scalar', () => {
-    const base = { key: 'original' };
-    const overlay = { key: 'updated' };
+  test("overlay scalar overwrites base scalar", () => {
+    const base = { key: "original" };
+    const overlay = { key: "updated" };
     const result = deepMerge(base, overlay, createContext());
-    assert.deepEqual(result, { key: 'updated' });
+    assert.deepEqual(result, { key: "updated" });
   });
 
-  test('preserves base keys not in overlay', () => {
+  test("preserves base keys not in overlay", () => {
     const base = { a: 1, b: 2 };
     const overlay = { b: 3 };
     const result = deepMerge(base, overlay, createContext());
     assert.deepEqual(result, { a: 1, b: 3 });
   });
 
-  test('adds overlay keys not in base', () => {
+  test("adds overlay keys not in base", () => {
     const base = { a: 1 };
     const overlay = { b: 2 };
     const result = deepMerge(base, overlay, createContext());
     assert.deepEqual(result, { a: 1, b: 2 });
   });
 
-  test('merges nested objects recursively', () => {
+  test("merges nested objects recursively", () => {
     const base = { nested: { a: 1, b: 2 } };
     const overlay = { nested: { b: 3, c: 4 } };
     const result = deepMerge(base, overlay, createContext());
     assert.deepEqual(result, { nested: { a: 1, b: 3, c: 4 } });
   });
 
-  test('replaces arrays by default', () => {
+  test("replaces arrays by default", () => {
     const base = { items: [1, 2, 3] };
     const overlay = { items: [4, 5] };
-    const result = deepMerge(base, overlay, createContext('replace'));
+    const result = deepMerge(base, overlay, createContext("replace"));
     assert.deepEqual(result, { items: [4, 5] });
   });
 
-  test('appends arrays when $arrayMerge: append in overlay', () => {
+  test("appends arrays when $arrayMerge: append in overlay", () => {
     const base = { items: [1, 2] };
-    const overlay = { items: { $arrayMerge: 'append', values: [3, 4] } };
+    const overlay = { items: { $arrayMerge: "append", values: [3, 4] } };
     const result = deepMerge(base, overlay, createContext());
     assert.deepEqual(result, { items: [1, 2, 3, 4] });
   });
 
-  test('appends arrays when $arrayMerge: append with array syntax', () => {
-    const base = { items: ['a', 'b'] };
-    const overlay = { items: ['c', 'd'], $arrayMerge: 'append' } as Record<
+  test("appends arrays when $arrayMerge: append with array syntax", () => {
+    const base = { items: ["a", "b"] };
+    const overlay = { items: ["c", "d"], $arrayMerge: "append" } as Record<
       string,
       unknown
     >;
     // When $arrayMerge is a sibling, it applies to all arrays in that object level
     const ctx = createContext();
-    ctx.arrayStrategies.set('items', 'append');
-    const result = deepMerge(base, { items: ['c', 'd'] }, ctx);
-    assert.deepEqual(result, { items: ['a', 'b', 'c', 'd'] });
+    ctx.arrayStrategies.set("items", "append");
+    const result = deepMerge(base, { items: ["c", "d"] }, ctx);
+    assert.deepEqual(result, { items: ["a", "b", "c", "d"] });
   });
 
-  test('prepends arrays when $arrayMerge: prepend', () => {
+  test("prepends arrays when $arrayMerge: prepend", () => {
     const base = { items: [1, 2] };
-    const overlay = { items: { $arrayMerge: 'prepend', values: [3, 4] } };
+    const overlay = { items: { $arrayMerge: "prepend", values: [3, 4] } };
     const result = deepMerge(base, overlay, createContext());
     assert.deepEqual(result, { items: [3, 4, 1, 2] });
   });
 
-  test('uses context arrayStrategies for path-specific merge', () => {
-    const base = { tags: ['a', 'b'], ids: [1, 2] };
-    const overlay = { tags: ['c'], ids: [3] };
-    const ctx = createContext('replace');
-    ctx.arrayStrategies.set('tags', 'append');
+  test("uses context arrayStrategies for path-specific merge", () => {
+    const base = { tags: ["a", "b"], ids: [1, 2] };
+    const overlay = { tags: ["c"], ids: [3] };
+    const ctx = createContext("replace");
+    ctx.arrayStrategies.set("tags", "append");
     const result = deepMerge(base, overlay, ctx);
-    assert.deepEqual(result, { tags: ['a', 'b', 'c'], ids: [3] });
+    assert.deepEqual(result, { tags: ["a", "b", "c"], ids: [3] });
   });
 
-  test('handles deeply nested structures', () => {
+  test("handles deeply nested structures", () => {
     const base = {
       level1: {
         level2: {
           level3: {
-            value: 'base',
+            value: "base",
             arr: [1],
           },
         },
@@ -117,8 +117,8 @@ describe('deepMerge', () => {
       level1: {
         level2: {
           level3: {
-            value: 'overlay',
-            newKey: 'added',
+            value: "overlay",
+            newKey: "added",
           },
         },
       },
@@ -128,135 +128,135 @@ describe('deepMerge', () => {
       level1: {
         level2: {
           level3: {
-            value: 'overlay',
+            value: "overlay",
             arr: [1],
-            newKey: 'added',
+            newKey: "added",
           },
         },
       },
     });
   });
 
-  test('overlay object replaces base primitive', () => {
-    const base = { key: 'string' };
-    const overlay = { key: { nested: 'object' } };
+  test("overlay object replaces base primitive", () => {
+    const base = { key: "string" };
+    const overlay = { key: { nested: "object" } };
     const result = deepMerge(
       base,
       overlay as Record<string, unknown>,
-      createContext()
+      createContext(),
     );
-    assert.deepEqual(result, { key: { nested: 'object' } });
+    assert.deepEqual(result, { key: { nested: "object" } });
   });
 
-  test('overlay primitive replaces base object', () => {
-    const base = { key: { nested: 'object' } };
-    const overlay = { key: 'string' };
+  test("overlay primitive replaces base object", () => {
+    const base = { key: { nested: "object" } };
+    const overlay = { key: "string" };
     const result = deepMerge(base, overlay, createContext());
-    assert.deepEqual(result, { key: 'string' });
+    assert.deepEqual(result, { key: "string" });
   });
 
-  test('handles null values correctly', () => {
-    const base = { key: 'value' };
+  test("handles null values correctly", () => {
+    const base = { key: "value" };
     const overlay = { key: null };
     const result = deepMerge(
       base,
       overlay as Record<string, unknown>,
-      createContext()
+      createContext(),
     );
     assert.deepEqual(result, { key: null });
   });
 
-  test('strips $arrayMerge directive from output', () => {
+  test("strips $arrayMerge directive from output", () => {
     const base = { items: [1, 2] };
-    const overlay = { items: { $arrayMerge: 'append', values: [3] } };
+    const overlay = { items: { $arrayMerge: "append", values: [3] } };
     const result = deepMerge(base, overlay, createContext());
-    assert.equal('$arrayMerge' in result, false);
+    assert.equal("$arrayMerge" in result, false);
   });
 
-  test('handles array of objects', () => {
+  test("handles array of objects", () => {
     const base = { items: [{ id: 1 }, { id: 2 }] };
     const overlay = { items: [{ id: 3 }] };
-    const result = deepMerge(base, overlay, createContext('replace'));
+    const result = deepMerge(base, overlay, createContext("replace"));
     assert.deepEqual(result, { items: [{ id: 3 }] });
   });
 
-  test('$arrayMerge in nested object sets strategy for child array', () => {
+  test("$arrayMerge in nested object sets strategy for child array", () => {
     const base = {
       config: {
-        features: ['a', 'b'],
+        features: ["a", "b"],
       },
     };
     const overlay = {
       config: {
-        $arrayMerge: 'append',
-        features: ['c'],
+        $arrayMerge: "append",
+        features: ["c"],
       },
     } as Record<string, unknown>;
     const result = deepMerge(base, overlay, createContext());
     assert.deepEqual(result, {
       config: {
-        features: ['a', 'b', 'c'],
+        features: ["a", "b", "c"],
       },
     });
   });
 });
 
-describe('stripMergeDirectives', () => {
-  test('removes $arrayMerge keys', () => {
-    const obj = { $arrayMerge: 'append', key: 'value' };
+describe("stripMergeDirectives", () => {
+  test("removes $arrayMerge keys", () => {
+    const obj = { $arrayMerge: "append", key: "value" };
     const result = stripMergeDirectives(obj);
-    assert.deepEqual(result, { key: 'value' });
+    assert.deepEqual(result, { key: "value" });
   });
 
-  test('removes $override keys', () => {
-    const obj = { $override: true, key: 'value' };
+  test("removes $override keys", () => {
+    const obj = { $override: true, key: "value" };
     const result = stripMergeDirectives(obj);
-    assert.deepEqual(result, { key: 'value' });
+    assert.deepEqual(result, { key: "value" });
   });
 
-  test('preserves regular keys', () => {
-    const obj = { key: 'value', another: 123 };
+  test("preserves regular keys", () => {
+    const obj = { key: "value", another: 123 };
     const result = stripMergeDirectives(obj);
-    assert.deepEqual(result, { key: 'value', another: 123 });
+    assert.deepEqual(result, { key: "value", another: 123 });
   });
 
-  test('works recursively on nested objects', () => {
+  test("works recursively on nested objects", () => {
     const obj = {
-      $arrayMerge: 'append',
+      $arrayMerge: "append",
       nested: {
         $override: true,
-        value: 'keep',
+        value: "keep",
       },
     };
     const result = stripMergeDirectives(obj);
-    assert.deepEqual(result, { nested: { value: 'keep' } });
+    assert.deepEqual(result, { nested: { value: "keep" } });
   });
 
-  test('works recursively on arrays of objects', () => {
+  test("works recursively on arrays of objects", () => {
     const obj = {
-      items: [{ $arrayMerge: 'append', name: 'item1' }, { name: 'item2' }],
+      items: [{ $arrayMerge: "append", name: "item1" }, { name: "item2" }],
     };
     const result = stripMergeDirectives(obj);
     assert.deepEqual(result, {
-      items: [{ name: 'item1' }, { name: 'item2' }],
+      items: [{ name: "item1" }, { name: "item2" }],
     });
   });
 
-  test('preserves keys starting with $ that are not directives', () => {
+  test("preserves keys starting with $ that are not directives", () => {
     // Only $arrayMerge and $override are directives
-    const obj = { $customKey: 'value', key: 'value' };
+    const obj = { $customKey: "value", key: "value" };
     const result = stripMergeDirectives(obj);
     // We strip ALL $ prefixed keys as they are reserved for directives
-    assert.deepEqual(result, { key: 'value' });
+    assert.deepEqual(result, { key: "value" });
   });
 
-  test('handles empty objects', () => {
+  test("handles empty objects", () => {
     const result = stripMergeDirectives({});
     assert.deepEqual(result, {});
   });
 
-  test('handles objects with only directives', () => {
-    const obj = { $arrayMerge: 'append', $override: true };
+  test("handles objects with only directives", () => {
+    const obj = { $arrayMerge: "append", $override: true };
     const result = stripMergeDirectives(obj);
     assert.deepEqual(result, {});
   });
