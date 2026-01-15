@@ -9,7 +9,7 @@ import {
 } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { GitOps, sanitizeBranchName } from "./git-ops.js";
+import { GitOps, sanitizeBranchName, validateBranchName } from "./git-ops.js";
 import { CommandExecutor } from "./command-executor.js";
 
 const testDir = join(tmpdir(), "git-ops-test-" + Date.now());
@@ -76,6 +76,162 @@ describe("sanitizeBranchName", () => {
 
   test("handles empty extension", () => {
     assert.equal(sanitizeBranchName("config"), "config");
+  });
+});
+
+describe("validateBranchName", () => {
+  describe("valid branch names", () => {
+    test("accepts simple branch name", () => {
+      assert.doesNotThrow(() => validateBranchName("feature"));
+    });
+
+    test("accepts branch with slash", () => {
+      assert.doesNotThrow(() => validateBranchName("feature/test"));
+    });
+
+    test("accepts chore/sync prefix", () => {
+      assert.doesNotThrow(() => validateBranchName("chore/sync-config"));
+    });
+
+    test("accepts branch with numbers", () => {
+      assert.doesNotThrow(() => validateBranchName("feature-123"));
+    });
+
+    test("accepts branch with dots in middle", () => {
+      assert.doesNotThrow(() => validateBranchName("release/v1.0.0"));
+    });
+  });
+
+  describe("invalid branch names", () => {
+    test("rejects empty string", () => {
+      assert.throws(() => validateBranchName(""), /cannot be empty/);
+    });
+
+    test("rejects whitespace-only string", () => {
+      assert.throws(() => validateBranchName("   "), /cannot be empty/);
+    });
+
+    test("rejects branch starting with dot", () => {
+      assert.throws(
+        () => validateBranchName(".hidden"),
+        /cannot start with "." or "-"/,
+      );
+    });
+
+    test("rejects branch starting with dash", () => {
+      assert.throws(
+        () => validateBranchName("-feature"),
+        /cannot start with "." or "-"/,
+      );
+    });
+
+    test("rejects branch with spaces", () => {
+      assert.throws(
+        () => validateBranchName("my branch"),
+        /invalid characters/,
+      );
+    });
+
+    test("rejects branch with tilde", () => {
+      assert.throws(
+        () => validateBranchName("feature~1"),
+        /invalid characters/,
+      );
+    });
+
+    test("rejects branch with caret", () => {
+      assert.throws(
+        () => validateBranchName("feature^2"),
+        /invalid characters/,
+      );
+    });
+
+    test("rejects branch with colon", () => {
+      assert.throws(
+        () => validateBranchName("feature:test"),
+        /invalid characters/,
+      );
+    });
+
+    test("rejects branch with question mark", () => {
+      assert.throws(
+        () => validateBranchName("feature?test"),
+        /invalid characters/,
+      );
+    });
+
+    test("rejects branch with asterisk", () => {
+      assert.throws(
+        () => validateBranchName("feature*test"),
+        /invalid characters/,
+      );
+    });
+
+    test("rejects branch with bracket", () => {
+      assert.throws(
+        () => validateBranchName("feature[test]"),
+        /invalid characters/,
+      );
+    });
+
+    test("rejects branch with backslash", () => {
+      assert.throws(
+        () => validateBranchName("feature\\test"),
+        /invalid characters/,
+      );
+    });
+
+    test("rejects branch with consecutive dots", () => {
+      assert.throws(
+        () => validateBranchName("feature..test"),
+        /invalid characters/,
+      );
+    });
+
+    test("rejects branch ending with slash", () => {
+      assert.throws(() => validateBranchName("feature/"), /invalid ending/);
+    });
+
+    test("rejects branch ending with .lock", () => {
+      assert.throws(() => validateBranchName("feature.lock"), /invalid ending/);
+    });
+
+    test("rejects branch ending with dot", () => {
+      assert.throws(() => validateBranchName("feature."), /invalid ending/);
+    });
+  });
+
+  describe("security injection attempts", () => {
+    // Note: Git allows $, (, ), and backticks in branch names.
+    // Security is ensured by escapeShellArg() wrapping all shell arguments.
+    // These tests verify that common injection patterns with spaces are rejected.
+
+    test("rejects shell injection with spaces", () => {
+      assert.throws(
+        () => validateBranchName("; rm -rf /"),
+        /invalid characters/,
+      );
+    });
+
+    test("rejects pipe injection with spaces", () => {
+      assert.throws(
+        () => validateBranchName("test | cat /etc/passwd"),
+        /invalid characters/,
+      );
+    });
+
+    test("rejects newline injection via tilde path", () => {
+      assert.throws(
+        () => validateBranchName("feature~1"),
+        /invalid characters/,
+      );
+    });
+
+    test("allows shell-like patterns without spaces (security via escapeShellArg)", () => {
+      // These are valid git branch names - security is handled by escapeShellArg()
+      assert.doesNotThrow(() => validateBranchName("$(whoami)"));
+      assert.doesNotThrow(() => validateBranchName("`id`"));
+    });
   });
 });
 

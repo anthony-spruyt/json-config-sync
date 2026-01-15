@@ -13,7 +13,7 @@ const packageJson = JSON.parse(
   readFileSync(join(__dirname, "..", "package.json"), "utf-8"),
 ) as { version: string };
 import { parseGitUrl, getRepoDisplayName } from "./repo-detector.js";
-import { sanitizeBranchName } from "./git-ops.js";
+import { sanitizeBranchName, validateBranchName } from "./git-ops.js";
 import { logger } from "./logger.js";
 import { generateWorkspaceName } from "./workspace-utils.js";
 import {
@@ -52,6 +52,7 @@ interface CLIOptions {
   dryRun?: boolean;
   workDir?: string;
   retries?: number;
+  branch?: string;
 }
 
 program
@@ -66,6 +67,10 @@ program
     "Number of retries for network operations (0 to disable)",
     (v) => parseInt(v, 10),
     3,
+  )
+  .option(
+    "-b, --branch <name>",
+    "Override the branch name (default: chore/sync-{filename})",
   )
   .parse();
 
@@ -85,7 +90,14 @@ async function main(): Promise<void> {
   }
 
   const config = loadConfig(configPath);
-  const branchName = `chore/sync-${sanitizeBranchName(config.fileName)}`;
+
+  let branchName: string;
+  if (options.branch) {
+    validateBranchName(options.branch);
+    branchName = options.branch;
+  } else {
+    branchName = `chore/sync-${sanitizeBranchName(config.fileName)}`;
+  }
 
   logger.setTotal(config.repos.length);
   console.log(`Found ${config.repos.length} repositories to process`);

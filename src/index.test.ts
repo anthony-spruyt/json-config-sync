@@ -59,6 +59,7 @@ describe("CLI", () => {
       assert.ok(result.stdout.includes("-d, --dry-run"));
       assert.ok(result.stdout.includes("-w, --work-dir"));
       assert.ok(result.stdout.includes("-r, --retries"));
+      assert.ok(result.stdout.includes("-b, --branch"));
     });
 
     test("requires --config option", () => {
@@ -160,6 +161,120 @@ repos:
       const output = result.stdout + result.stderr;
       assert.ok(
         output.includes("Loading config") || output.includes("Processing"),
+      );
+    });
+
+    test("accepts --branch option with valid branch name", () => {
+      writeFileSync(
+        testConfigPath,
+        `
+fileName: test.json
+repos:
+  - git: git@github.com:test/invalid-repo-for-test.git
+    content:
+      key: value
+`,
+      );
+
+      const result = runCLI([
+        "-c",
+        testConfigPath,
+        "--dry-run",
+        "--branch",
+        "feature/custom-branch",
+        "-w",
+        `${testDir}/work`,
+      ]);
+      const output = result.stdout + result.stderr;
+      assert.ok(
+        output.includes("feature/custom-branch"),
+        "Should display custom branch name",
+      );
+    });
+
+    test("accepts -b shorthand for --branch", () => {
+      writeFileSync(
+        testConfigPath,
+        `
+fileName: test.json
+repos:
+  - git: git@github.com:test/invalid-repo-for-test.git
+    content:
+      key: value
+`,
+      );
+
+      const result = runCLI([
+        "-c",
+        testConfigPath,
+        "--dry-run",
+        "-b",
+        "chore/my-sync",
+        "-w",
+        `${testDir}/work`,
+      ]);
+      const output = result.stdout + result.stderr;
+      assert.ok(
+        output.includes("chore/my-sync"),
+        "Should display custom branch name with -b shorthand",
+      );
+    });
+
+    test("rejects invalid branch name starting with dot", () => {
+      writeFileSync(
+        testConfigPath,
+        `
+fileName: test.json
+repos:
+  - git: git@github.com:test/repo.git
+    content:
+      key: value
+`,
+      );
+
+      const result = runCLI([
+        "-c",
+        testConfigPath,
+        "--dry-run",
+        "--branch",
+        ".hidden-branch",
+        "-w",
+        `${testDir}/work`,
+      ]);
+      assert.equal(result.success, false);
+      const output = result.stdout + result.stderr;
+      assert.ok(
+        output.includes('cannot start with "." or "-"'),
+        "Should show validation error for branch starting with dot",
+      );
+    });
+
+    test("rejects invalid branch name with spaces", () => {
+      writeFileSync(
+        testConfigPath,
+        `
+fileName: test.json
+repos:
+  - git: git@github.com:test/repo.git
+    content:
+      key: value
+`,
+      );
+
+      const result = runCLI([
+        "-c",
+        testConfigPath,
+        "--dry-run",
+        "--branch",
+        "my branch",
+        "-w",
+        `${testDir}/work`,
+      ]);
+      assert.equal(result.success, false);
+      const output = result.stdout + result.stderr;
+      assert.ok(
+        output.includes("invalid characters"),
+        "Should show validation error for branch with spaces",
       );
     });
   });

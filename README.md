@@ -1,7 +1,6 @@
 # json-config-sync
 
 [![CI](https://github.com/anthony-spruyt/json-config-sync/actions/workflows/ci.yml/badge.svg)](https://github.com/anthony-spruyt/json-config-sync/actions/workflows/ci.yml)
-[![Integration Test](https://github.com/anthony-spruyt/json-config-sync/actions/workflows/integration.yml/badge.svg)](https://github.com/anthony-spruyt/json-config-sync/actions/workflows/integration.yml)
 [![npm version](https://img.shields.io/npm/v/@aspruyt/json-config-sync.svg)](https://www.npmjs.com/package/@aspruyt/json-config-sync)
 [![npm downloads](https://img.shields.io/npm/dw/@aspruyt/json-config-sync.svg)](https://www.npmjs.com/package/@aspruyt/json-config-sync)
 
@@ -123,16 +122,20 @@ json-config-sync --config ./config.yaml --dry-run
 
 # Custom work directory
 json-config-sync --config ./config.yaml --work-dir ./my-temp
+
+# Custom branch name
+json-config-sync --config ./config.yaml --branch feature/update-eslint
 ```
 
 ### Options
 
-| Option       | Alias | Description                                           | Required |
-| ------------ | ----- | ----------------------------------------------------- | -------- |
-| `--config`   | `-c`  | Path to YAML config file                              | Yes      |
-| `--dry-run`  | `-d`  | Show what would be done without making changes        | No       |
-| `--work-dir` | `-w`  | Temporary directory for cloning (default: `./tmp`)    | No       |
-| `--retries`  | `-r`  | Number of retries for network operations (default: 3) | No       |
+| Option       | Alias | Description                                             | Required |
+| ------------ | ----- | ------------------------------------------------------- | -------- |
+| `--config`   | `-c`  | Path to YAML config file                                | Yes      |
+| `--dry-run`  | `-d`  | Show what would be done without making changes          | No       |
+| `--work-dir` | `-w`  | Temporary directory for cloning (default: `./tmp`)      | No       |
+| `--retries`  | `-r`  | Number of retries for network operations (default: 3)   | No       |
+| `--branch`   | `-b`  | Override branch name (default: `chore/sync-{filename}`) | No       |
 
 ## Configuration Format
 
@@ -317,7 +320,7 @@ flowchart TB
     end
 
     subgraph Processing["For Each Repository"]
-        CLONE[Clone Repo] --> BRANCH[Create/Checkout Branch<br/>chore/sync-filename]
+        CLONE[Clone Repo] --> BRANCH[Create/Checkout Branch<br/>--branch or chore/sync-filename]
         BRANCH --> WRITE[Write Config File<br/>JSON or YAML]
         WRITE --> CHECK{Changes?}
         CHECK -->|No| SKIP[Skip - No Changes]
@@ -347,7 +350,7 @@ For each repository in the config, the tool:
 3. Interpolates environment variables
 4. Cleans the temporary workspace
 5. Clones the repository
-6. Creates/checks out branch `chore/sync-{sanitized-filename}`
+6. Creates/checks out branch (custom `--branch` or default `chore/sync-{sanitized-filename}`)
 7. Generates the config file (JSON or YAML based on filename extension)
 8. Checks for changes (skips if no changes)
 9. Commits and pushes changes
