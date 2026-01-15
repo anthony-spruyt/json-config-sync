@@ -1,0 +1,26 @@
+import { RepoInfo, isGitHubRepo, isAzureDevOpsRepo } from "../repo-detector.js";
+import type { PRStrategy } from "./pr-strategy.js";
+import { GitHubPRStrategy } from "./github-pr-strategy.js";
+import { AzurePRStrategy } from "./azure-pr-strategy.js";
+
+export type { PRStrategy, PRStrategyOptions } from "./pr-strategy.js";
+export { BasePRStrategy } from "./pr-strategy.js";
+export { GitHubPRStrategy } from "./github-pr-strategy.js";
+export { AzurePRStrategy } from "./azure-pr-strategy.js";
+
+/**
+ * Factory function to get the appropriate PR strategy for a repository
+ */
+export function getPRStrategy(repoInfo: RepoInfo): PRStrategy {
+  if (isGitHubRepo(repoInfo)) {
+    return new GitHubPRStrategy();
+  }
+
+  if (isAzureDevOpsRepo(repoInfo)) {
+    return new AzurePRStrategy(repoInfo);
+  }
+
+  // Type exhaustiveness check - should never reach here
+  const _exhaustive: never = repoInfo;
+  throw new Error(`Unknown repository type: ${JSON.stringify(_exhaustive)}`);
+}

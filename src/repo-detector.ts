@@ -1,13 +1,35 @@
 export type RepoType = "github" | "azure-devops";
 
-export interface RepoInfo {
-  type: RepoType;
+// Base interface with common fields
+interface BaseRepoInfo {
   gitUrl: string;
-  owner: string;
   repo: string;
-  // Azure DevOps specific
-  organization?: string;
-  project?: string;
+}
+
+// GitHub-specific type
+export interface GitHubRepoInfo extends BaseRepoInfo {
+  type: "github";
+  owner: string;
+}
+
+// Azure DevOps-specific type
+export interface AzureDevOpsRepoInfo extends BaseRepoInfo {
+  type: "azure-devops";
+  owner: string;
+  organization: string;
+  project: string;
+}
+
+// Discriminated union
+export type RepoInfo = GitHubRepoInfo | AzureDevOpsRepoInfo;
+
+// Type guards
+export function isGitHubRepo(info: RepoInfo): info is GitHubRepoInfo {
+  return info.type === "github";
+}
+
+export function isAzureDevOpsRepo(info: RepoInfo): info is AzureDevOpsRepoInfo {
+  return info.type === "azure-devops";
 }
 
 export function detectRepoType(gitUrl: string): RepoType {
@@ -33,7 +55,7 @@ export function parseGitUrl(gitUrl: string): RepoInfo {
   return parseGitHubUrl(gitUrl);
 }
 
-function parseGitHubUrl(gitUrl: string): RepoInfo {
+function parseGitHubUrl(gitUrl: string): GitHubRepoInfo {
   // Handle SSH format: git@github.com:owner/repo.git
   // Use (.+?) with end anchor to handle repo names with dots (e.g., my.repo.git)
   const sshMatch = gitUrl.match(/git@github\.com:([^/]+)\/(.+?)(?:\.git)?$/);
@@ -63,7 +85,7 @@ function parseGitHubUrl(gitUrl: string): RepoInfo {
   throw new Error(`Unable to parse GitHub URL: ${gitUrl}`);
 }
 
-function parseAzureDevOpsUrl(gitUrl: string): RepoInfo {
+function parseAzureDevOpsUrl(gitUrl: string): AzureDevOpsRepoInfo {
   // Handle SSH format: git@ssh.dev.azure.com:v3/organization/project/repo
   // Use (.+?) with end anchor to handle repo names with dots
   const sshMatch = gitUrl.match(

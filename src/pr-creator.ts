@@ -1,9 +1,8 @@
-import { execSync } from "node:child_process";
-import { readFileSync, existsSync, writeFileSync, unlinkSync } from "node:fs";
+import { readFileSync, existsSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { RepoInfo } from "./repo-detector.js";
-import { escapeShellArg } from "./shell-utils.js";
+import { getPRStrategy } from "./strategies/index.js";
 
 // Re-export for backwards compatibility and testing
 export { escapeShellArg } from "./shell-utils.js";
@@ -78,145 +77,13 @@ export async function createPR(options: PROptions): Promise<PRResult> {
     };
   }
 
-  try {
-    if (repoInfo.type === "github") {
-      return await createGitHubPR({
-        title,
-        body,
-        branchName,
-        baseBranch,
-        workDir,
-      });
-    } else {
-      return await createAzureDevOpsPR({
-        title,
-        body,
-        branchName,
-        baseBranch,
-        repoInfo,
-        workDir,
-      });
-    }
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    return {
-      success: false,
-      message: `Failed to create PR: ${message}`,
-    };
-  }
-}
-
-interface GitHubPROptions {
-  title: string;
-  body: string;
-  branchName: string;
-  baseBranch: string;
-  workDir: string;
-}
-
-async function createGitHubPR(options: GitHubPROptions): Promise<PRResult> {
-  const { title, body, branchName, baseBranch, workDir } = options;
-
-  // Check if PR already exists
-  try {
-    const existingPR = execSync(
-      `gh pr list --head ${escapeShellArg(branchName)} --json url --jq '.[0].url'`,
-      { cwd: workDir, encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"] },
-    ).trim();
-
-    if (existingPR) {
-      return {
-        url: existingPR,
-        success: true,
-        message: `PR already exists: ${existingPR}`,
-      };
-    }
-  } catch {
-    // No existing PR, continue to create
-  }
-
-  // Write body to temp file to avoid shell escaping issues
-  const bodyFile = join(workDir, ".pr-body.md");
-  writeFileSync(bodyFile, body, "utf-8");
-
-  try {
-    const result = execSync(
-      `gh pr create --title ${escapeShellArg(title)} --body-file ${escapeShellArg(bodyFile)} --base ${escapeShellArg(baseBranch)} --head ${escapeShellArg(branchName)}`,
-      { cwd: workDir, encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"] },
-    ).trim();
-
-    // Extract URL from output
-    const urlMatch = result.match(/https:\/\/github\.com\/[^\s]+/);
-
-    return {
-      url: urlMatch?.[0] ?? result,
-      success: true,
-      message: "PR created successfully",
-    };
-  } finally {
-    // Clean up temp file
-    if (existsSync(bodyFile)) {
-      unlinkSync(bodyFile);
-    }
-  }
-}
-
-interface AzureDevOpsPROptions {
-  title: string;
-  body: string;
-  branchName: string;
-  baseBranch: string;
-  repoInfo: RepoInfo;
-  workDir: string;
-}
-
-async function createAzureDevOpsPR(
-  options: AzureDevOpsPROptions,
-): Promise<PRResult> {
-  const { title, body, branchName, baseBranch, repoInfo, workDir } = options;
-
-  const orgUrl = `https://dev.azure.com/${encodeURIComponent(repoInfo.organization ?? "")}`;
-
-  // Check if PR already exists
-  try {
-    const existingPRs = execSync(
-      `az repos pr list --repository ${escapeShellArg(repoInfo.repo)} --source-branch ${escapeShellArg(branchName)} --target-branch ${escapeShellArg(baseBranch)} --org ${escapeShellArg(orgUrl)} --project ${escapeShellArg(repoInfo.project ?? "")} --query "[0].pullRequestId" -o tsv`,
-      { cwd: workDir, encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"] },
-    ).trim();
-
-    if (existingPRs) {
-      const prUrl = `https://dev.azure.com/${encodeURIComponent(repoInfo.organization ?? "")}/${encodeURIComponent(repoInfo.project ?? "")}/_git/${encodeURIComponent(repoInfo.repo)}/pullrequest/${existingPRs}`;
-      return {
-        url: prUrl,
-        success: true,
-        message: `PR already exists: ${prUrl}`,
-      };
-    }
-  } catch {
-    // No existing PR, continue to create
-  }
-
-  // Write description to temp file to avoid shell escaping issues
-  const descFile = join(workDir, ".pr-description.md");
-  writeFileSync(descFile, body, "utf-8");
-
-  try {
-    const result = execSync(
-      `az repos pr create --repository ${escapeShellArg(repoInfo.repo)} --source-branch ${escapeShellArg(branchName)} --target-branch ${escapeShellArg(baseBranch)} --title ${escapeShellArg(title)} --description @${escapeShellArg(descFile)} --org ${escapeShellArg(orgUrl)} --project ${escapeShellArg(repoInfo.project ?? "")} --query "pullRequestId" -o tsv`,
-      { cwd: workDir, encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"] },
-    ).trim();
-
-    const prUrl = `https://dev.azure.com/${encodeURIComponent(repoInfo.organization ?? "")}/${encodeURIComponent(repoInfo.project ?? "")}/_git/${encodeURIComponent(repoInfo.repo)}/pullrequest/${result}`;
-
-    return {
-      url: prUrl,
-      success: true,
-      message: "PR created successfully",
-    };
-  } finally {
-    // Clean up temp file
-    if (existsSync(descFile)) {
-      unlinkSync(descFile);
-    }
-  }
+  // Get the appropriate strategy and execute
+  const strategy = getPRStrategy(repoInfo);
+  return strategy.execute({
+    title,
+    body,
+    branchName,
+    baseBranch,
+    workDir,
+  });
 }
