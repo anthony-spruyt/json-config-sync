@@ -18,6 +18,7 @@ const PERMANENT_ERROR_PATTERNS = [
   /does\s*not\s*exist/i,
   /repository\s*not\s*found/i,
   /no\s*such\s*(file|directory|remote|ref)/i,
+  /couldn't\s*find\s*remote\s*ref/i,
   /invalid\s*remote/i,
   /not\s*a\s*git\s*repository/i,
   /non-fast-forward/i,
