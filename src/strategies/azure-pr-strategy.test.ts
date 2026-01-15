@@ -374,7 +374,7 @@ describe("AzurePRStrategy Azure CLI command format", () => {
     }
   });
 
-  test("uses @/path format for description file, not @'/path'", async () => {
+  test("escapes @/path format for description file to prevent shell injection", async () => {
     const azureRepoInfo: AzureDevOpsRepoInfo = {
       type: "azure-devops",
       gitUrl: "git@ssh.dev.azure.com:v3/myorg/myproject/myrepo",
@@ -399,20 +399,15 @@ describe("AzurePRStrategy Azure CLI command format", () => {
 
     await strategy.create(options);
 
-    // Verify the command uses @/path/file format, not @'/path/file'
+    // Verify the command escapes the @/path/file format for security
     const command = mockExecutor.calls[0].command;
     const descFile = join(testDir, ".pr-description.md");
 
-    // Should contain @/path directly without quotes around the path
+    // Should contain escaped @/path format: '@/path/to/file'
+    // The @ is included inside the quotes to prevent shell interpretation issues
     assert.ok(
-      command.includes(`--description @${descFile}`),
-      `Command should use @<path> format without escaping. Got: ${command}`,
-    );
-
-    // Should NOT contain @'/path' (escaped format)
-    assert.ok(
-      !command.includes(`@'${descFile}'`),
-      `Command should NOT use @'<path>' format. Got: ${command}`,
+      command.includes(`--description '@${descFile}'`),
+      `Command should escape @<path> format with single quotes. Got: ${command}`,
     );
   });
 });

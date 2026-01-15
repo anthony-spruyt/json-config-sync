@@ -75,9 +75,8 @@ export class AzurePRStrategy extends BasePRStrategy {
     const descFile = join(workDir, this.bodyFilePath);
     writeFileSync(descFile, body, "utf-8");
 
-    // Note: Azure CLI @file syntax expects the path directly after @, without escaping
-    // The path is already validated as an absolute path within workDir
-    const command = `az repos pr create --repository ${escapeShellArg(azureRepoInfo.repo)} --source-branch ${escapeShellArg(branchName)} --target-branch ${escapeShellArg(baseBranch)} --title ${escapeShellArg(title)} --description @${descFile} --org ${escapeShellArg(orgUrl)} --project ${escapeShellArg(azureRepoInfo.project)} --query "pullRequestId" -o tsv`;
+    // Azure CLI @file syntax: escape the full @path to handle special chars in workDir
+    const command = `az repos pr create --repository ${escapeShellArg(azureRepoInfo.repo)} --source-branch ${escapeShellArg(branchName)} --target-branch ${escapeShellArg(baseBranch)} --title ${escapeShellArg(title)} --description ${escapeShellArg("@" + descFile)} --org ${escapeShellArg(orgUrl)} --project ${escapeShellArg(azureRepoInfo.project)} --query "pullRequestId" -o tsv`;
 
     try {
       const prId = await withRetry(() => this.executor.exec(command, workDir), {

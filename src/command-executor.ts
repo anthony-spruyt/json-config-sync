@@ -21,11 +21,20 @@ export interface CommandExecutor {
  */
 export class ShellCommandExecutor implements CommandExecutor {
   async exec(command: string, cwd: string): Promise<string> {
-    return execSync(command, {
-      cwd,
-      encoding: "utf-8",
-      stdio: ["pipe", "pipe", "pipe"],
-    }).trim();
+    try {
+      return execSync(command, {
+        cwd,
+        encoding: "utf-8",
+        stdio: ["pipe", "pipe", "pipe"],
+      }).trim();
+    } catch (error) {
+      // Ensure stderr is always a string for consistent error handling
+      const execError = error as { stderr?: Buffer | string };
+      if (execError.stderr && typeof execError.stderr !== "string") {
+        execError.stderr = execError.stderr.toString();
+      }
+      throw error;
+    }
   }
 }
 

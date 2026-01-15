@@ -44,7 +44,14 @@ export interface Config {
 
 export function loadConfig(filePath: string): Config {
   const content = readFileSync(filePath, "utf-8");
-  const rawConfig = parse(content) as RawConfig;
+
+  let rawConfig: RawConfig;
+  try {
+    rawConfig = parse(content) as RawConfig;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`Failed to parse YAML config at ${filePath}: ${message}`);
+  }
 
   validateRawConfig(rawConfig);
 

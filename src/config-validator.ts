@@ -17,6 +17,11 @@ export function validateRawConfig(config: RawConfig): void {
     );
   }
 
+  // Validate fileName doesn't contain control characters that could bypass shell escaping
+  if (/[\n\r\0]/.test(config.fileName)) {
+    throw new Error(`Invalid fileName: cannot contain newlines or null bytes`);
+  }
+
   if (!config.repos || !Array.isArray(config.repos)) {
     throw new Error("Config missing required field: repos (must be an array)");
   }

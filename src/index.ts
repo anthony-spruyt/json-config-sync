@@ -1,9 +1,17 @@
 #!/usr/bin/env node
 
 import { program } from "commander";
-import { resolve, join } from "node:path";
-import { existsSync } from "node:fs";
+import { resolve, join, dirname } from "node:path";
+import { existsSync, readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { loadConfig } from "./config.js";
+
+// Get version from package.json
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const packageJson = JSON.parse(
+  readFileSync(join(__dirname, "..", "package.json"), "utf-8"),
+) as { version: string };
 import { parseGitUrl, getRepoDisplayName } from "./repo-detector.js";
 import { sanitizeBranchName } from "./git-ops.js";
 import { logger } from "./logger.js";
@@ -49,7 +57,7 @@ interface CLIOptions {
 program
   .name("json-config-sync")
   .description("Sync JSON configuration files across multiple repositories")
-  .version("1.0.0")
+  .version(packageJson.version)
   .requiredOption("-c, --config <path>", "Path to YAML config file")
   .option("-d, --dry-run", "Show what would be done without making changes")
   .option("-w, --work-dir <path>", "Temporary directory for cloning", "./tmp")

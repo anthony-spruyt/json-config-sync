@@ -100,6 +100,9 @@ export class GitOps {
         `git fetch origin ${escapeShellArg(branchName)}`,
         this.workDir,
       );
+      // Ensure clean workspace before checkout (defensive - handles edge cases)
+      await this.exec("git reset --hard HEAD", this.workDir);
+      await this.exec("git clean -fd", this.workDir);
       await this.execWithRetry(
         `git checkout ${escapeShellArg(branchName)}`,
         this.workDir,
