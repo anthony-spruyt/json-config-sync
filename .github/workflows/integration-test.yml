@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 jobs:
   integration-test:
@@ -20,22 +21,20 @@ jobs:
       cancel-in-progress: false
 
     steps:
-      - name: Checkout triggering commit
-        uses: actions/checkout@v6
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
         with:
-          ref: ${{ github.event.workflow_run.head_sha }}
+          name: build-${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ github.event.workflow_run.id }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
           node-version: "20"
-          cache: "npm"
 
       - name: Install dependencies
         run: npm ci
-
-      - name: Build
-        run: npm run build
 
       - name: Configure git
         env:
@@ -48,4 +47,4 @@ jobs:
       - name: Run integration tests
         env:
           GH_TOKEN: ${{ secrets.GH_PAT }}
-        run: npm run test:integration
+        run: node --import tsx --test src/integration.test.ts
