@@ -39,7 +39,5 @@ jobs:
           path: |
             dist/
             fixtures/
-            package.json
-            package-lock.json
             src/integration.test.ts
           retention-days: 1

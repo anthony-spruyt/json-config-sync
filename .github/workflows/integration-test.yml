@@ -21,20 +21,30 @@ jobs:
       cancel-in-progress: false
 
     steps:
+      - name: Checkout main branch (for trusted package.json)
+        uses: actions/checkout@v6
+        with:
+          ref: main
+          sparse-checkout: |
+            package.json
+            package-lock.json
+          sparse-checkout-cone-mode: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies from main branch
+        run: npm ci
+
       - name: Download build artifacts
         uses: actions/download-artifact@v4
         with:
           name: build-${{ github.event.workflow_run.id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
           run-id: ${{ github.event.workflow_run.id }}
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version: "20"
-
-      - name: Install dependencies
-        run: npm ci
 
       - name: Configure git
         env:
