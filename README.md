@@ -35,14 +35,13 @@ gh auth login
 
 # Create config.yaml
 cat > config.yaml << 'EOF'
-fileName: .prettierrc.json
-
-# Base configuration inherited by all repos
-content:
-  semi: false
-  singleQuote: true
-  tabWidth: 2
-  trailingComma: es5
+files:
+  .prettierrc.json:
+    content:
+      semi: false
+      singleQuote: true
+      tabWidth: 2
+      trailingComma: es5
 
 repos:
   # Multiple repos can share the same config
@@ -60,6 +59,7 @@ json-config-sync --config ./config.yaml
 
 ## Features
 
+- **Multi-File Sync** - Sync multiple config files in a single run
 - **JSON/YAML Output** - Automatically outputs JSON or YAML based on filename extension
 - **Content Inheritance** - Define base config once, override per-repo as needed
 - **Multi-Repo Targeting** - Apply same config to multiple repos with array syntax
@@ -129,61 +129,84 @@ json-config-sync --config ./config.yaml --branch feature/update-eslint
 
 ### Options
 
-| Option       | Alias | Description                                             | Required |
-| ------------ | ----- | ------------------------------------------------------- | -------- |
-| `--config`   | `-c`  | Path to YAML config file                                | Yes      |
-| `--dry-run`  | `-d`  | Show what would be done without making changes          | No       |
-| `--work-dir` | `-w`  | Temporary directory for cloning (default: `./tmp`)      | No       |
-| `--retries`  | `-r`  | Number of retries for network operations (default: 3)   | No       |
-| `--branch`   | `-b`  | Override branch name (default: `chore/sync-{filename}`) | No       |
+| Option       | Alias | Description                                           | Required |
+| ------------ | ----- | ----------------------------------------------------- | -------- |
+| `--config`   | `-c`  | Path to YAML config file                              | Yes      |
+| `--dry-run`  | `-d`  | Show what would be done without making changes        | No       |
+| `--work-dir` | `-w`  | Temporary directory for cloning (default: `./tmp`)    | No       |
+| `--retries`  | `-r`  | Number of retries for network operations (default: 3) | No       |
+| `--branch`   | `-b`  | Override branch name (default: `chore/sync-config`)   | No       |
 
 ## Configuration Format
 
 ### Basic Structure
 
 ```yaml
-fileName: my.config.json # Target file (.json outputs JSON, .yaml/.yml outputs YAML)
-mergeStrategy: replace # Default array merge strategy (optional)
-
-content: # Base config content (optional)
-  key: value
+files:
+  my.config.json: # Target file (.json outputs JSON, .yaml/.yml outputs YAML)
+    mergeStrategy: replace # Array merge strategy for this file (optional)
+    content: # Base config content
+      key: value
 
 repos: # List of repositories
   - git: git@github.com:org/repo.git
-    content: # Per-repo overlay (optional if base content exists)
-      key: override
+    files: # Per-repo file overrides (optional)
+      my.config.json:
+        content:
+          key: override
 ```
 
 ### Root-Level Fields
 
-| Field           | Description                                                            | Required |
-| --------------- | ---------------------------------------------------------------------- | -------- |
-| `fileName`      | Target file name (`.json` → JSON output, `.yaml`/`.yml` → YAML output) | Yes      |
-| `content`       | Base config inherited by all repos                                     | No\*     |
-| `mergeStrategy` | Default array merge strategy: `replace`, `append`, `prepend`           | No       |
-| `repos`         | Array of repository configurations                                     | Yes      |
+| Field   | Description                        | Required |
+| ------- | ---------------------------------- | -------- |
+| `files` | Map of target filenames to configs | Yes      |
+| `repos` | Array of repository configurations | Yes      |
 
-\* Required if any repo entry omits the `content` field.
+### Per-File Fields
+
+| Field           | Description                                          | Required |
+| --------------- | ---------------------------------------------------- | -------- |
+| `content`       | Base config inherited by all repos                   | Yes      |
+| `mergeStrategy` | Array merge strategy: `replace`, `append`, `prepend` | No       |
 
 ### Per-Repo Fields
 
-| Field      | Description                                                | Required |
-| ---------- | ---------------------------------------------------------- | -------- |
-| `git`      | Git URL (string) or array of URLs                          | Yes      |
-| `content`  | Content overlay merged onto base (optional if base exists) | No\*     |
-| `override` | If `true`, ignore base content and use only this repo's    | No       |
+| Field   | Description                        | Required |
+| ------- | ---------------------------------- | -------- |
+| `git`   | Git URL (string) or array of URLs  | Yes      |
+| `files` | Per-repo file overrides (optional) | No       |
 
-\* Required if no root-level `content` is defined.
+### Per-Repo File Override Fields
+
+| Field      | Description                                             | Required |
+| ---------- | ------------------------------------------------------- | -------- |
+| `content`  | Content overlay merged onto file's base content         | No       |
+| `override` | If `true`, ignore base content and use only this repo's | No       |
+
+**File Exclusion:** Set a file to `false` to exclude it from a specific repo:
+
+```yaml
+repos:
+  - git: git@github.com:org/repo.git
+    files:
+      eslint.json: false # This repo won't receive eslint.json
+```
 
 ### Environment Variables
 
 Use `${VAR}` syntax in string values:
 
 ```yaml
-content:
-  apiUrl: ${API_URL} # Required - errors if not set
-  environment: ${ENV:-development} # With default value
-  secretKey: ${SECRET:?Secret required} # Required with custom error message
+files:
+  app.config.json:
+    content:
+      apiUrl: ${API_URL} # Required - errors if not set
+      environment: ${ENV:-development} # With default value
+      secretKey: ${SECRET:?Secret required} # Required with custom error message
+
+repos:
+  - git: git@github.com:org/backend.git
 ```
 
 ### Merge Directives
@@ -191,66 +214,106 @@ content:
 Control array merging with the `$arrayMerge` directive:
 
 ```yaml
-content:
-  features:
-    - core
-    - monitoring
+files:
+  config.json:
+    content:
+      features:
+        - core
+        - monitoring
 
 repos:
   - git: git@github.com:org/repo.git
-    content:
-      features:
-        $arrayMerge: append # append | prepend | replace
-        values:
-          - custom-feature # Results in: [core, monitoring, custom-feature]
+    files:
+      config.json:
+        content:
+          features:
+            $arrayMerge: append # append | prepend | replace
+            values:
+              - custom-feature # Results in: [core, monitoring, custom-feature]
 ```
 
 ## Examples
+
+### Multi-File Sync
+
+Sync multiple configuration files to all repos:
+
+```yaml
+files:
+  .eslintrc.json:
+    content:
+      extends: ["@org/eslint-config"]
+      rules:
+        no-console: warn
+
+  .prettierrc.yaml:
+    content:
+      semi: false
+      singleQuote: true
+
+  tsconfig.json:
+    content:
+      compilerOptions:
+        strict: true
+        target: ES2022
+
+repos:
+  - git:
+      - git@github.com:org/frontend.git
+      - git@github.com:org/backend.git
+      - git@github.com:org/shared-lib.git
+```
 
 ### Shared Config Across Teams
 
 Define common settings once, customize per team:
 
 ```yaml
-fileName: service.config.json
-
-content:
-  version: "2.0"
-  logging:
-    level: info
-    format: json
-  features:
-    - health-check
-    - metrics
+files:
+  service.config.json:
+    content:
+      version: "2.0"
+      logging:
+        level: info
+        format: json
+      features:
+        - health-check
+        - metrics
 
 repos:
   # Platform team repos - add extra features
   - git:
       - git@github.com:org/api-gateway.git
       - git@github.com:org/auth-service.git
-    content:
-      team: platform
-      features:
-        $arrayMerge: append
-        values:
-          - tracing
-          - rate-limiting
+    files:
+      service.config.json:
+        content:
+          team: platform
+          features:
+            $arrayMerge: append
+            values:
+              - tracing
+              - rate-limiting
 
   # Data team repos - different logging
   - git:
       - git@github.com:org/data-pipeline.git
       - git@github.com:org/analytics.git
-    content:
-      team: data
-      logging:
-        level: debug
+    files:
+      service.config.json:
+        content:
+          team: data
+          logging:
+            level: debug
 
   # Legacy service - completely different config
   - git: git@github.com:org/legacy-api.git
-    override: true
-    content:
-      version: "1.0"
-      legacy: true
+    files:
+      service.config.json:
+        override: true
+        content:
+          version: "1.0"
+          legacy: true
 ```
 
 ### Environment-Specific Values
@@ -258,40 +321,46 @@ repos:
 Use environment variables for secrets and environment-specific values:
 
 ```yaml
-fileName: app.config.json
+files:
+  app.config.json:
+    content:
+      database:
+        host: ${DB_HOST:-localhost}
+        port: ${DB_PORT:-5432}
+        password: ${DB_PASSWORD:?Database password required}
 
-content:
-  database:
-    host: ${DB_HOST:-localhost}
-    port: ${DB_PORT:-5432}
-    password: ${DB_PASSWORD:?Database password required}
-
-  api:
-    baseUrl: ${API_BASE_URL}
-    timeout: 30000
+      api:
+        baseUrl: ${API_BASE_URL}
+        timeout: 30000
 
 repos:
   - git: git@github.com:org/backend.git
 ```
 
-### Simple Multi-Repo Sync
+### Per-File Merge Strategies
 
-When all repos need identical config:
+Different files can use different array merge strategies:
 
 ```yaml
-fileName: .eslintrc.json
+files:
+  eslint.config.json:
+    mergeStrategy: append # Extends will append
+    content:
+      extends: ["@company/base"]
 
-content:
-  extends: ["@org/eslint-config"]
-  rules:
-    no-console: warn
+  tsconfig.json:
+    mergeStrategy: replace # Lib will replace entirely
+    content:
+      compilerOptions:
+        lib: ["ES2022"]
 
 repos:
-  - git:
-      - git@github.com:org/frontend.git
-      - git@github.com:org/backend.git
-      - git@github.com:org/shared-lib.git
-      - git@github.com:org/cli-tool.git
+  - git: git@github.com:org/frontend.git
+    files:
+      eslint.config.json:
+        content:
+          extends: ["plugin:react/recommended"]
+      # Results in extends: ["@company/base", "plugin:react/recommended"]
 ```
 
 ## Supported Git URL Formats
@@ -311,17 +380,17 @@ repos:
 ```mermaid
 flowchart TB
     subgraph Input
-        YAML[/"YAML Config File<br/>fileName + content + repos[]"/]
+        YAML[/"YAML Config File<br/>files{} + repos[]"/]
     end
 
     subgraph Normalization
-        EXPAND[Expand git arrays] --> MERGE[Merge base + overlay content]
+        EXPAND[Expand git arrays] --> MERGE[Merge base + overlay content<br/>for each file]
         MERGE --> ENV[Interpolate env vars]
     end
 
     subgraph Processing["For Each Repository"]
-        CLONE[Clone Repo] --> BRANCH[Create/Checkout Branch<br/>--branch or chore/sync-filename]
-        BRANCH --> WRITE[Write Config File<br/>JSON or YAML]
+        CLONE[Clone Repo] --> BRANCH[Create/Checkout Branch<br/>--branch or chore/sync-config]
+        BRANCH --> WRITE[Write All Config Files<br/>JSON or YAML]
         WRITE --> CHECK{Changes?}
         CHECK -->|No| SKIP[Skip - No Changes]
         CHECK -->|Yes| COMMIT[Commit Changes]
@@ -346,12 +415,12 @@ flowchart TB
 For each repository in the config, the tool:
 
 1. Expands git URL arrays into individual entries
-2. Merges base content with per-repo overlay
+2. For each file, merges base content with per-repo overlay
 3. Interpolates environment variables
 4. Cleans the temporary workspace
 5. Clones the repository
-6. Creates/checks out branch (custom `--branch` or default `chore/sync-{sanitized-filename}`)
-7. Generates the config file (JSON or YAML based on filename extension)
+6. Creates/checks out branch (custom `--branch` or default `chore/sync-config`)
+7. Writes all config files (JSON or YAML based on filename extension)
 8. Checks for changes (skips if no changes)
 9. Commits and pushes changes
 10. Creates a pull request
@@ -416,22 +485,25 @@ steps:
 ```
 [1/3] Processing example-org/repo1...
   ✓ Cloned repository
-  ✓ Created branch chore/sync-my-config
-  ✓ Wrote my.config.json
+  ✓ Created branch chore/sync-config
+  ✓ Wrote .eslintrc.json
+  ✓ Wrote .prettierrc.yaml
   ✓ Committed changes
   ✓ Pushed to remote
   ✓ Created PR: https://github.com/example-org/repo1/pull/42
 
 [2/3] Processing example-org/repo2...
   ✓ Cloned repository
-  ✓ Checked out existing branch chore/sync-my-config
-  ✓ Wrote my.config.json
+  ✓ Checked out existing branch chore/sync-config
+  ✓ Wrote .eslintrc.json
+  ✓ Wrote .prettierrc.yaml
   ⊘ No changes detected, skipping
 
 [3/3] Processing example-org/repo3...
   ✓ Cloned repository
-  ✓ Created branch chore/sync-my-config
-  ✓ Wrote my.config.json
+  ✓ Created branch chore/sync-config
+  ✓ Wrote .eslintrc.json
+  ✓ Wrote .prettierrc.yaml
   ✓ Committed changes
   ✓ Pushed to remote
   ✓ PR already exists: https://github.com/example-org/repo3/pull/15
@@ -443,9 +515,9 @@ Summary: 2 succeeded, 1 skipped, 0 failed
 
 The tool creates PRs with:
 
-- **Title:** `chore: sync {fileName}`
-- **Branch:** `chore/sync-{sanitized-filename}`
-- **Body:** Describes the sync action and links to documentation
+- **Title:** `chore: sync config files` (or lists files if ≤3)
+- **Branch:** `chore/sync-config` (or custom `--branch`)
+- **Body:** Describes the sync action and lists changed files
 
 ## Troubleshooting
 
@@ -484,7 +556,7 @@ The tool automatically reuses existing branches. If you see unexpected behavior:
 
 ```bash
 # Delete the remote branch to start fresh
-git push origin --delete chore/sync-my-config
+git push origin --delete chore/sync-config
 ```
 
 ### Missing Environment Variables
@@ -534,9 +606,11 @@ For autocomplete and validation in VS Code, install the [YAML extension](https:/
 
 ```yaml
 # yaml-language-server: $schema=https://raw.githubusercontent.com/anthony-spruyt/json-config-sync/main/config-schema.json
-fileName: my.config.json
-content:
-  key: value
+files:
+  my.config.json:
+    content:
+      key: value
+
 repos:
   - git: git@github.com:org/repo.git
 ```
@@ -556,7 +630,7 @@ repos:
 
 This enables:
 
-- Autocomplete for `fileName`, `mergeStrategy`, `repos`, `content`, `git`, `override`
+- Autocomplete for `files`, `repos`, `content`, `mergeStrategy`, `git`, `override`
 - Enum suggestions for `mergeStrategy` values (`replace`, `append`, `prepend`)
 - Validation of required fields
 - Hover documentation for each field

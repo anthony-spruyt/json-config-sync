@@ -1,52 +1,55 @@
 import { isAbsolute } from "node:path";
 import type { RawConfig } from "./config.js";
 
+const VALID_STRATEGIES = ["replace", "append", "prepend"];
+
 /**
  * Validates raw config structure before normalization.
  * @throws Error if validation fails
  */
 export function validateRawConfig(config: RawConfig): void {
-  if (!config.fileName) {
-    throw new Error("Config missing required field: fileName");
+  if (!config.files || typeof config.files !== "object") {
+    throw new Error("Config missing required field: files (must be an object)");
   }
 
-  // Validate fileName doesn't allow path traversal
-  if (config.fileName.includes("..") || isAbsolute(config.fileName)) {
-    throw new Error(
-      `Invalid fileName: must be a relative path without '..' components`,
-    );
+  const fileNames = Object.keys(config.files);
+  if (fileNames.length === 0) {
+    throw new Error("Config files object cannot be empty");
   }
 
-  // Validate fileName doesn't contain control characters that could bypass shell escaping
-  if (/[\n\r\0]/.test(config.fileName)) {
-    throw new Error(`Invalid fileName: cannot contain newlines or null bytes`);
+  // Validate each file definition
+  for (const fileName of fileNames) {
+    validateFileName(fileName);
+
+    const fileConfig = config.files[fileName];
+    if (!fileConfig || typeof fileConfig !== "object") {
+      throw new Error(`File '${fileName}' must have a configuration object`);
+    }
+
+    if (
+      fileConfig.content !== undefined &&
+      (typeof fileConfig.content !== "object" ||
+        fileConfig.content === null ||
+        Array.isArray(fileConfig.content))
+    ) {
+      throw new Error(`File '${fileName}' content must be an object`);
+    }
+
+    if (
+      fileConfig.mergeStrategy !== undefined &&
+      !VALID_STRATEGIES.includes(fileConfig.mergeStrategy)
+    ) {
+      throw new Error(
+        `File '${fileName}' has invalid mergeStrategy: ${fileConfig.mergeStrategy}. Must be one of: ${VALID_STRATEGIES.join(", ")}`,
+      );
+    }
   }
 
   if (!config.repos || !Array.isArray(config.repos)) {
     throw new Error("Config missing required field: repos (must be an array)");
   }
 
-  const validStrategies = ["replace", "append", "prepend"];
-  if (
-    config.mergeStrategy !== undefined &&
-    !validStrategies.includes(config.mergeStrategy)
-  ) {
-    throw new Error(
-      `Invalid mergeStrategy: ${config.mergeStrategy}. Must be one of: ${validStrategies.join(", ")}`,
-    );
-  }
-
-  if (
-    config.content !== undefined &&
-    (typeof config.content !== "object" ||
-      config.content === null ||
-      Array.isArray(config.content))
-  ) {
-    throw new Error("Root content must be an object");
-  }
-
-  const hasRootContent = config.content !== undefined;
-
+  // Validate each repo
   for (let i = 0; i < config.repos.length; i++) {
     const repo = config.repos[i];
     if (!repo.git) {
@@ -55,16 +58,69 @@ export function validateRawConfig(config: RawConfig): void {
     if (Array.isArray(repo.git) && repo.git.length === 0) {
       throw new Error(`Repo at index ${i} has empty git array`);
     }
-    if (!hasRootContent && !repo.content) {
-      throw new Error(
-        `Repo at index ${i} missing required field: content (no root-level content defined)`,
-      );
+
+    // Validate per-repo file overrides
+    if (repo.files) {
+      if (typeof repo.files !== "object" || Array.isArray(repo.files)) {
+        throw new Error(`Repo at index ${i}: files must be an object`);
+      }
+
+      for (const fileName of Object.keys(repo.files)) {
+        // Ensure the file is defined at root level
+        if (!config.files[fileName]) {
+          throw new Error(
+            `Repo at index ${i} references undefined file '${fileName}'. File must be defined in root 'files' object.`,
+          );
+        }
+
+        const fileOverride = repo.files[fileName];
+
+        // false means exclude this file for this repo - no further validation needed
+        if (fileOverride === false) {
+          continue;
+        }
+
+        if (fileOverride.override && !fileOverride.content) {
+          throw new Error(
+            `Repo ${getGitDisplayName(repo.git)} has override: true for file '${fileName}' but no content defined`,
+          );
+        }
+
+        if (
+          fileOverride.content !== undefined &&
+          (typeof fileOverride.content !== "object" ||
+            fileOverride.content === null ||
+            Array.isArray(fileOverride.content))
+        ) {
+          throw new Error(
+            `Repo at index ${i}: file '${fileName}' content must be an object`,
+          );
+        }
+      }
     }
-    if (repo.override && !repo.content) {
-      throw new Error(
-        `Repo ${getGitDisplayName(repo.git)} has override: true but no content defined`,
-      );
-    }
+  }
+}
+
+/**
+ * Validates a file name for security issues
+ */
+function validateFileName(fileName: string): void {
+  if (!fileName || typeof fileName !== "string") {
+    throw new Error("File name must be a non-empty string");
+  }
+
+  // Validate fileName doesn't allow path traversal
+  if (fileName.includes("..") || isAbsolute(fileName)) {
+    throw new Error(
+      `Invalid fileName '${fileName}': must be a relative path without '..' components`,
+    );
+  }
+
+  // Validate fileName doesn't contain control characters that could bypass shell escaping
+  if (/[\n\r\0]/.test(fileName)) {
+    throw new Error(
+      `Invalid fileName '${fileName}': cannot contain newlines or null bytes`,
+    );
   }
 }
 

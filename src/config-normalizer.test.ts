@@ -4,60 +4,51 @@ import { normalizeConfig } from "./config-normalizer.js";
 import type { RawConfig } from "./config.js";
 
 describe("normalizeConfig", () => {
-  const originalEnv = { ...process.env };
-
   beforeEach(() => {
-    // Set up test environment variables
     process.env.TEST_VAR = "test-value";
-    process.env.ENV_VAR = "env-value";
   });
 
   afterEach(() => {
-    // Restore original environment
-    process.env = { ...originalEnv };
+    delete process.env.TEST_VAR;
   });
 
   describe("git array expansion", () => {
     test("expands single git URL to one repo entry", () => {
       const raw: RawConfig = {
-        fileName: "config.json",
-        content: { key: "value" },
+        files: { "config.json": { content: { key: "value" } } },
         repos: [{ git: "git@github.com:org/repo.git" }],
       };
 
       const result = normalizeConfig(raw);
-
       assert.equal(result.repos.length, 1);
       assert.equal(result.repos[0].git, "git@github.com:org/repo.git");
     });
 
     test("expands git array to multiple repo entries", () => {
       const raw: RawConfig = {
-        fileName: "config.json",
-        content: { key: "value" },
+        files: { "config.json": { content: { key: "value" } } },
         repos: [
           {
             git: [
               "git@github.com:org/repo1.git",
               "git@github.com:org/repo2.git",
-              "git@github.com:org/repo3.git",
             ],
           },
         ],
       };
 
       const result = normalizeConfig(raw);
-
-      assert.equal(result.repos.length, 3);
+      assert.equal(result.repos.length, 2);
       assert.equal(result.repos[0].git, "git@github.com:org/repo1.git");
       assert.equal(result.repos[1].git, "git@github.com:org/repo2.git");
-      assert.equal(result.repos[2].git, "git@github.com:org/repo3.git");
     });
 
-    test("each expanded repo gets same content", () => {
+    test("each expanded repo gets all files", () => {
       const raw: RawConfig = {
-        fileName: "config.json",
-        content: { key: "value" },
+        files: {
+          "config.json": { content: { key: "value" } },
+          "settings.yaml": { content: { enabled: true } },
+        },
         repos: [
           {
             git: [
@@ -69,143 +60,66 @@ describe("normalizeConfig", () => {
       };
 
       const result = normalizeConfig(raw);
-
-      assert.deepEqual(result.repos[0].content, { key: "value" });
-      assert.deepEqual(result.repos[1].content, { key: "value" });
+      assert.equal(result.repos[0].files.length, 2);
+      assert.equal(result.repos[1].files.length, 2);
     });
 
     test("handles multiple repos with mixed single and array git", () => {
       const raw: RawConfig = {
-        fileName: "config.json",
-        content: { key: "value" },
+        files: { "config.json": { content: {} } },
         repos: [
-          { git: "git@github.com:org/repo1.git" },
+          { git: "git@github.com:org/single.git" },
           {
             git: [
-              "git@github.com:org/repo2.git",
-              "git@github.com:org/repo3.git",
+              "git@github.com:org/array1.git",
+              "git@github.com:org/array2.git",
             ],
           },
-          { git: "git@github.com:org/repo4.git" },
         ],
       };
 
       const result = normalizeConfig(raw);
-
-      assert.equal(result.repos.length, 4);
-      assert.equal(result.repos[0].git, "git@github.com:org/repo1.git");
-      assert.equal(result.repos[1].git, "git@github.com:org/repo2.git");
-      assert.equal(result.repos[2].git, "git@github.com:org/repo3.git");
-      assert.equal(result.repos[3].git, "git@github.com:org/repo4.git");
+      assert.equal(result.repos.length, 3);
     });
   });
 
-  describe("content merging", () => {
-    test("uses root content when repo has no content", () => {
+  describe("all repos receive all files", () => {
+    test("all files delivered to all repos by default", () => {
       const raw: RawConfig = {
-        fileName: "config.json",
-        content: { root: "content", nested: { a: 1 } },
-        repos: [{ git: "git@github.com:org/repo.git" }],
-      };
-
-      const result = normalizeConfig(raw);
-
-      assert.deepEqual(result.repos[0].content, {
-        root: "content",
-        nested: { a: 1 },
-      });
-    });
-
-    test("merges repo content with root content (replace strategy)", () => {
-      const raw: RawConfig = {
-        fileName: "config.json",
-        content: { base: "value", overwrite: "original" },
+        files: {
+          "eslint.json": { content: { extends: ["base"] } },
+          "prettier.json": { content: { semi: true } },
+        },
         repos: [
-          {
-            git: "git@github.com:org/repo.git",
-            content: { overwrite: "new", extra: "data" },
-          },
+          { git: "git@github.com:org/repo1.git" },
+          { git: "git@github.com:org/repo2.git" },
         ],
       };
 
       const result = normalizeConfig(raw);
 
-      assert.deepEqual(result.repos[0].content, {
-        base: "value",
-        overwrite: "new",
-        extra: "data",
-      });
-    });
+      // Both repos should have both files
+      assert.equal(result.repos[0].files.length, 2);
+      assert.equal(result.repos[1].files.length, 2);
 
-    test("deep merges nested objects", () => {
+      // Check file names
+      const repo1FileNames = result.repos[0].files.map((f) => f.fileName);
+      assert.deepEqual(repo1FileNames, ["eslint.json", "prettier.json"]);
+    });
+  });
+
+  describe("file exclusion", () => {
+    test("excludes file when set to false", () => {
       const raw: RawConfig = {
-        fileName: "config.json",
-        content: {
-          nested: { a: 1, b: 2 },
+        files: {
+          "eslint.json": { content: { extends: ["base"] } },
+          "prettier.json": { content: { semi: true } },
         },
         repos: [
           {
             git: "git@github.com:org/repo.git",
-            content: { nested: { b: 3, c: 4 } },
-          },
-        ],
-      };
-
-      const result = normalizeConfig(raw);
-
-      assert.deepEqual(result.repos[0].content, {
-        nested: { a: 1, b: 3, c: 4 },
-      });
-    });
-
-    test("uses override mode when override is true", () => {
-      const raw: RawConfig = {
-        fileName: "config.json",
-        content: { base: "value", should: "not appear" },
-        repos: [
-          {
-            git: "git@github.com:org/repo.git",
-            override: true,
-            content: { only: "this" },
-          },
-        ],
-      };
-
-      const result = normalizeConfig(raw);
-
-      assert.deepEqual(result.repos[0].content, { only: "this" });
-    });
-
-    test("respects mergeStrategy option", () => {
-      const raw: RawConfig = {
-        fileName: "config.json",
-        mergeStrategy: "append",
-        content: { items: ["a", "b"] },
-        repos: [
-          {
-            git: "git@github.com:org/repo.git",
-            content: { items: ["c", "d"] },
-          },
-        ],
-      };
-
-      const result = normalizeConfig(raw);
-
-      // With append strategy, arrays should be concatenated
-      assert.deepEqual(result.repos[0].content, {
-        items: ["a", "b", "c", "d"],
-      });
-    });
-
-    test("strips merge directives from output", () => {
-      const raw: RawConfig = {
-        fileName: "config.json",
-        content: { items: ["a"] },
-        repos: [
-          {
-            git: "git@github.com:org/repo.git",
-            content: {
-              items: { $arrayMerge: "append", values: ["b"] },
+            files: {
+              "eslint.json": false,
             },
           },
         ],
@@ -213,83 +127,286 @@ describe("normalizeConfig", () => {
 
       const result = normalizeConfig(raw);
 
-      // $arrayMerge directive should be stripped
-      assert.ok(
-        !JSON.stringify(result.repos[0].content).includes("$arrayMerge"),
-      );
-    });
-  });
-
-  describe("environment variable interpolation", () => {
-    test("interpolates env vars in content", () => {
-      const raw: RawConfig = {
-        fileName: "config.json",
-        content: { key: "${TEST_VAR}" },
-        repos: [{ git: "git@github.com:org/repo.git" }],
-      };
-
-      const result = normalizeConfig(raw);
-
-      assert.equal(result.repos[0].content.key, "test-value");
+      // Only prettier.json should be included
+      assert.equal(result.repos[0].files.length, 1);
+      assert.equal(result.repos[0].files[0].fileName, "prettier.json");
     });
 
-    test("interpolates env vars in repo content", () => {
+    test("excludes multiple files", () => {
       const raw: RawConfig = {
-        fileName: "config.json",
-        content: {},
+        files: {
+          "eslint.json": { content: { extends: ["base"] } },
+          "prettier.json": { content: { semi: true } },
+          "tsconfig.json": { content: { strict: true } },
+        },
         repos: [
           {
             git: "git@github.com:org/repo.git",
-            content: { value: "${ENV_VAR}" },
+            files: {
+              "eslint.json": false,
+              "tsconfig.json": false,
+            },
           },
         ],
       };
 
       const result = normalizeConfig(raw);
 
-      assert.equal(result.repos[0].content.value, "env-value");
+      // Only prettier.json should be included
+      assert.equal(result.repos[0].files.length, 1);
+      assert.equal(result.repos[0].files[0].fileName, "prettier.json");
+    });
+
+    test("different repos can exclude different files", () => {
+      const raw: RawConfig = {
+        files: {
+          "eslint.json": { content: { extends: ["base"] } },
+          "prettier.json": { content: { semi: true } },
+        },
+        repos: [
+          {
+            git: "git@github.com:org/repo1.git",
+            files: {
+              "eslint.json": false,
+            },
+          },
+          {
+            git: "git@github.com:org/repo2.git",
+            files: {
+              "prettier.json": false,
+            },
+          },
+        ],
+      };
+
+      const result = normalizeConfig(raw);
+
+      // repo1: only prettier.json
+      assert.equal(result.repos[0].files.length, 1);
+      assert.equal(result.repos[0].files[0].fileName, "prettier.json");
+
+      // repo2: only eslint.json
+      assert.equal(result.repos[1].files.length, 1);
+      assert.equal(result.repos[1].files[0].fileName, "eslint.json");
+    });
+
+    test("can mix exclusion with overrides", () => {
+      const raw: RawConfig = {
+        files: {
+          "eslint.json": { content: { extends: ["base"] } },
+          "prettier.json": { content: { semi: true } },
+        },
+        repos: [
+          {
+            git: "git@github.com:org/repo.git",
+            files: {
+              "eslint.json": false,
+              "prettier.json": { content: { tabWidth: 4 } },
+            },
+          },
+        ],
+      };
+
+      const result = normalizeConfig(raw);
+
+      // Only prettier.json, with merged content
+      assert.equal(result.repos[0].files.length, 1);
+      assert.equal(result.repos[0].files[0].fileName, "prettier.json");
+      assert.deepEqual(result.repos[0].files[0].content, {
+        semi: true,
+        tabWidth: 4,
+      });
+    });
+  });
+
+  describe("content merging", () => {
+    test("uses file base content when repo has no override", () => {
+      const raw: RawConfig = {
+        files: {
+          "config.json": { content: { base: "value" } },
+        },
+        repos: [{ git: "git@github.com:org/repo.git" }],
+      };
+
+      const result = normalizeConfig(raw);
+      assert.deepEqual(result.repos[0].files[0].content, { base: "value" });
+    });
+
+    test("merges repo file content with file base content", () => {
+      const raw: RawConfig = {
+        files: {
+          "config.json": { content: { base: "value", override: "original" } },
+        },
+        repos: [
+          {
+            git: "git@github.com:org/repo.git",
+            files: {
+              "config.json": { content: { override: "updated", added: "new" } },
+            },
+          },
+        ],
+      };
+
+      const result = normalizeConfig(raw);
+      assert.deepEqual(result.repos[0].files[0].content, {
+        base: "value",
+        override: "updated",
+        added: "new",
+      });
+    });
+
+    test("deep merges nested objects", () => {
+      const raw: RawConfig = {
+        files: {
+          "config.json": { content: { nested: { a: 1, b: 2 } } },
+        },
+        repos: [
+          {
+            git: "git@github.com:org/repo.git",
+            files: {
+              "config.json": { content: { nested: { b: 3, c: 4 } } },
+            },
+          },
+        ],
+      };
+
+      const result = normalizeConfig(raw);
+      assert.deepEqual(result.repos[0].files[0].content, {
+        nested: { a: 1, b: 3, c: 4 },
+      });
+    });
+
+    test("uses override mode when override is true", () => {
+      const raw: RawConfig = {
+        files: {
+          "config.json": { content: { base: "value" } },
+        },
+        repos: [
+          {
+            git: "git@github.com:org/repo.git",
+            files: {
+              "config.json": {
+                override: true,
+                content: { only: "repo-value" },
+              },
+            },
+          },
+        ],
+      };
+
+      const result = normalizeConfig(raw);
+      assert.deepEqual(result.repos[0].files[0].content, {
+        only: "repo-value",
+      });
+    });
+
+    test("respects per-file mergeStrategy", () => {
+      const raw: RawConfig = {
+        files: {
+          "config.json": {
+            content: { items: ["a", "b"] },
+            mergeStrategy: "append",
+          },
+        },
+        repos: [
+          {
+            git: "git@github.com:org/repo.git",
+            files: {
+              "config.json": { content: { items: ["c", "d"] } },
+            },
+          },
+        ],
+      };
+
+      const result = normalizeConfig(raw);
+      assert.deepEqual(result.repos[0].files[0].content, {
+        items: ["a", "b", "c", "d"],
+      });
+    });
+
+    test("strips merge directives from output", () => {
+      const raw: RawConfig = {
+        files: {
+          "config.json": { content: { items: ["a"] } },
+        },
+        repos: [
+          {
+            git: "git@github.com:org/repo.git",
+            files: {
+              "config.json": {
+                content: {
+                  items: { $arrayMerge: "append", values: ["b"] },
+                },
+              },
+            },
+          },
+        ],
+      };
+
+      const result = normalizeConfig(raw);
+      const jsonStr = JSON.stringify(result.repos[0].files[0].content);
+      assert.ok(!jsonStr.includes("$arrayMerge"));
+    });
+  });
+
+  describe("environment variable interpolation", () => {
+    test("interpolates env vars in content", () => {
+      const raw: RawConfig = {
+        files: {
+          "config.json": { content: { value: "${TEST_VAR}" } },
+        },
+        repos: [{ git: "git@github.com:org/repo.git" }],
+      };
+
+      const result = normalizeConfig(raw);
+      assert.deepEqual(result.repos[0].files[0].content, {
+        value: "test-value",
+      });
     });
 
     test("interpolates env vars with defaults", () => {
       const raw: RawConfig = {
-        fileName: "config.json",
-        content: { key: "${MISSING_VAR:-default-val}" },
+        files: {
+          "config.json": { content: { value: "${MISSING:-default}" } },
+        },
         repos: [{ git: "git@github.com:org/repo.git" }],
       };
 
       const result = normalizeConfig(raw);
-
-      assert.equal(result.repos[0].content.key, "default-val");
+      assert.deepEqual(result.repos[0].files[0].content, { value: "default" });
     });
 
     test("throws on missing required env var", () => {
       const raw: RawConfig = {
-        fileName: "config.json",
-        content: { key: "${MISSING_REQUIRED_VAR}" },
+        files: {
+          "config.json": { content: { value: "${MISSING_VAR}" } },
+        },
         repos: [{ git: "git@github.com:org/repo.git" }],
       };
 
-      assert.throws(() => normalizeConfig(raw), /MISSING_REQUIRED_VAR/);
+      assert.throws(
+        () => normalizeConfig(raw),
+        /Missing required environment variable: MISSING_VAR/,
+      );
     });
   });
 
   describe("output structure", () => {
-    test("preserves fileName in output", () => {
+    test("preserves fileName in files array", () => {
       const raw: RawConfig = {
-        fileName: "my-config.yaml",
-        content: { key: "value" },
+        files: {
+          "my/config.json": { content: { key: "value" } },
+        },
         repos: [{ git: "git@github.com:org/repo.git" }],
       };
 
       const result = normalizeConfig(raw);
-
-      assert.equal(result.fileName, "my-config.yaml");
+      assert.equal(result.repos[0].files[0].fileName, "my/config.json");
     });
 
     test("output repos are independent (no shared references)", () => {
       const raw: RawConfig = {
-        fileName: "config.json",
-        content: { shared: { data: "value" } },
+        files: { "config.json": { content: { key: "value" } } },
         repos: [
           {
             git: [
@@ -303,62 +420,57 @@ describe("normalizeConfig", () => {
       const result = normalizeConfig(raw);
 
       // Modify one repo's content
-      (result.repos[0].content.shared as Record<string, unknown>).data =
-        "modified";
+      result.repos[0].files[0].content.key = "modified";
 
       // Other repo should be unaffected
-      assert.equal(
-        (result.repos[1].content.shared as Record<string, unknown>).data,
-        "value",
-      );
+      assert.equal(result.repos[1].files[0].content.key, "value");
     });
 
     test("returns empty repos array when input has empty repos", () => {
       const raw: RawConfig = {
-        fileName: "config.json",
-        content: { key: "value" },
+        files: { "config.json": { content: {} } },
         repos: [],
       };
 
       const result = normalizeConfig(raw);
-
-      assert.equal(result.repos.length, 0);
+      assert.deepEqual(result.repos, []);
     });
   });
 
-  describe("default values", () => {
-    test("uses empty object when content is undefined", () => {
+  describe("multiple files with different strategies", () => {
+    test("each file uses its own mergeStrategy", () => {
       const raw: RawConfig = {
-        fileName: "config.json",
+        files: {
+          "append.json": {
+            content: { items: ["a"] },
+            mergeStrategy: "append",
+          },
+          "replace.json": {
+            content: { items: ["x"] },
+            mergeStrategy: "replace",
+          },
+        },
         repos: [
           {
             git: "git@github.com:org/repo.git",
-            content: { explicit: "content" },
+            files: {
+              "append.json": { content: { items: ["b"] } },
+              "replace.json": { content: { items: ["y"] } },
+            },
           },
         ],
       };
 
       const result = normalizeConfig(raw);
+      const appendFile = result.repos[0].files.find(
+        (f) => f.fileName === "append.json",
+      );
+      const replaceFile = result.repos[0].files.find(
+        (f) => f.fileName === "replace.json",
+      );
 
-      assert.deepEqual(result.repos[0].content, { explicit: "content" });
-    });
-
-    test("uses replace as default merge strategy", () => {
-      const raw: RawConfig = {
-        fileName: "config.json",
-        content: { items: ["a", "b"] },
-        repos: [
-          {
-            git: "git@github.com:org/repo.git",
-            content: { items: ["c", "d"] },
-          },
-        ],
-      };
-
-      const result = normalizeConfig(raw);
-
-      // Replace strategy means arrays are replaced, not merged
-      assert.deepEqual(result.repos[0].content, { items: ["c", "d"] });
+      assert.deepEqual(appendFile?.content.items, ["a", "b"]);
+      assert.deepEqual(replaceFile?.content.items, ["y"]);
     });
   });
 });

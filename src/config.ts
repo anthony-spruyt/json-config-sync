@@ -11,16 +11,28 @@ export { convertContentToString } from "./config-formatter.js";
 // Raw Config Types (as parsed from YAML)
 // =============================================================================
 
-export interface RawRepoConfig {
-  git: string | string[];
+// Per-file configuration at root level
+export interface RawFileConfig {
+  content: Record<string, unknown>;
+  mergeStrategy?: ArrayMergeStrategy;
+}
+
+// Per-repo file override
+export interface RawRepoFileOverride {
   content?: Record<string, unknown>;
   override?: boolean;
 }
 
+// Repo configuration
+// files can map to false to exclude, or an object to override
+export interface RawRepoConfig {
+  git: string | string[];
+  files?: Record<string, RawRepoFileOverride | false>;
+}
+
+// Root config structure
 export interface RawConfig {
-  fileName: string;
-  content?: Record<string, unknown>;
-  mergeStrategy?: ArrayMergeStrategy;
+  files: Record<string, RawFileConfig>;
   repos: RawRepoConfig[];
 }
 
@@ -28,13 +40,20 @@ export interface RawConfig {
 // Normalized Config Types (output)
 // =============================================================================
 
-export interface RepoConfig {
-  git: string;
+// File content for a single file in a repo
+export interface FileContent {
+  fileName: string;
   content: Record<string, unknown>;
 }
 
+// Normalized repo config with all files to sync
+export interface RepoConfig {
+  git: string;
+  files: FileContent[];
+}
+
+// Normalized config
 export interface Config {
-  fileName: string;
   repos: RepoConfig[];
 }
 
