@@ -70,11 +70,47 @@ program
   )
   .option(
     "-b, --branch <name>",
-    "Override the branch name (default: chore/sync-{filename})",
+    "Override the branch name (default: chore/sync-{filename} or chore/sync-config)",
   )
   .parse();
 
 const options = program.opts<CLIOptions>();
+
+/**
+ * Get unique file names from all repos in the config
+ */
+function getUniqueFileNames(config: { repos: RepoConfig[] }): string[] {
+  const fileNames = new Set<string>();
+  for (const repo of config.repos) {
+    for (const file of repo.files) {
+      fileNames.add(file.fileName);
+    }
+  }
+  return Array.from(fileNames);
+}
+
+/**
+ * Generate default branch name based on files being synced
+ */
+function generateBranchName(fileNames: string[]): string {
+  if (fileNames.length === 1) {
+    return `chore/sync-${sanitizeBranchName(fileNames[0])}`;
+  }
+  return "chore/sync-config";
+}
+
+/**
+ * Format file names for display
+ */
+function formatFileNames(fileNames: string[]): string {
+  if (fileNames.length === 1) {
+    return fileNames[0];
+  }
+  if (fileNames.length <= 3) {
+    return fileNames.join(", ");
+  }
+  return `${fileNames.length} files`;
+}
 
 async function main(): Promise<void> {
   const configPath = resolve(options.config);
@@ -90,18 +126,19 @@ async function main(): Promise<void> {
   }
 
   const config = loadConfig(configPath);
+  const fileNames = getUniqueFileNames(config);
 
   let branchName: string;
   if (options.branch) {
     validateBranchName(options.branch);
     branchName = options.branch;
   } else {
-    branchName = `chore/sync-${sanitizeBranchName(config.fileName)}`;
+    branchName = generateBranchName(fileNames);
   }
 
   logger.setTotal(config.repos.length);
   console.log(`Found ${config.repos.length} repositories to process`);
-  console.log(`Target file: ${config.fileName}`);
+  console.log(`Target files: ${formatFileNames(fileNames)}`);
   console.log(`Branch: ${branchName}\n`);
 
   const processor = defaultProcessorFactory();
@@ -128,7 +165,6 @@ async function main(): Promise<void> {
       logger.progress(current, repoName, "Processing...");
 
       const result = await processor.process(repoConfig, repoInfo, {
-        fileName: config.fileName,
         branchName,
         workDir,
         dryRun: options.dryRun,

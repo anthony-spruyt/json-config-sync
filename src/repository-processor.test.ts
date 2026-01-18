@@ -1,19 +1,9 @@
 import { test, describe, beforeEach, afterEach } from "node:test";
 import { strict as assert } from "node:assert";
-import {
-  mkdirSync,
-  rmSync,
-  writeFileSync,
-  readdirSync,
-  existsSync,
-} from "node:fs";
+import { mkdirSync, rmSync, writeFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import {
-  RepositoryProcessor,
-  GitOpsFactory,
-  ProcessorOptions,
-} from "./repository-processor.js";
+import { RepositoryProcessor, GitOpsFactory } from "./repository-processor.js";
 import { RepoConfig } from "./config.js";
 import { GitHubRepoInfo } from "./repo-detector.js";
 import { GitOps, GitOpsOptions } from "./git-ops.js";
@@ -27,7 +17,12 @@ describe("RepositoryProcessor", () => {
 
   const mockRepoConfig: RepoConfig = {
     git: "git@github.com:test/repo.git",
-    content: { key: "value" },
+    files: [
+      {
+        fileName: "config.json",
+        content: { key: "value" },
+      },
+    ],
   };
 
   const mockRepoInfo: GitHubRepoInfo = {
@@ -53,7 +48,6 @@ describe("RepositoryProcessor", () => {
       // will fail without a real repo, which is expected
       try {
         await processor.process(mockRepoConfig, mockRepoInfo, {
-          fileName: "config.json",
           branchName: "chore/sync-config",
           workDir,
           dryRun: true,
@@ -73,7 +67,6 @@ describe("RepositoryProcessor", () => {
 
       try {
         await processor.process(mockRepoConfig, mockRepoInfo, {
-          fileName: "config.json",
           branchName: "chore/sync-config",
           workDir,
           dryRun: false,
@@ -192,7 +185,6 @@ describe("RepositoryProcessor", () => {
       const localWorkDir = join(testDir, `action-test-skip-${Date.now()}`);
 
       const result = await processor.process(mockRepoConfig, mockRepoInfo, {
-        fileName: "config.json",
         branchName: "chore/sync-config",
         workDir: localWorkDir,
         dryRun: true,
@@ -216,7 +208,6 @@ describe("RepositoryProcessor", () => {
       const localWorkDir = join(testDir, `action-test-update-${Date.now()}`);
 
       const result = await processor.process(mockRepoConfig, mockRepoInfo, {
-        fileName: "config.json",
         branchName: "chore/sync-config",
         workDir: localWorkDir,
         dryRun: true, // Use dry run to avoid actual git/PR operations
@@ -246,7 +237,6 @@ describe("RepositoryProcessor", () => {
       const localWorkDir = join(testDir, `action-test-create-${Date.now()}`);
 
       const result = await processor.process(mockRepoConfig, mockRepoInfo, {
-        fileName: "config.json",
         branchName: "chore/sync-config",
         workDir: localWorkDir,
         dryRun: true, // Use dry run to avoid actual git/PR operations

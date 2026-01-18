@@ -13,20 +13,29 @@ TypeScript CLI tool that syncs JSON or YAML configuration files across multiple 
 The config loading process normalizes raw YAML input into a standardized format:
 
 ```
-Raw YAML → Parse → Validate → Expand git arrays → Deep merge → Env interpolate → Config
+Raw YAML → Parse → Validate → Expand git arrays → Deep merge per file → Env interpolate → Config
 ```
 
 **Types**:
 
 - `RawConfig` / `RawRepoConfig`: As parsed from YAML (flexible input format)
-- `Config` / `RepoConfig`: Normalized output (each entry has single git URL + merged content)
+- `Config` / `RepoConfig`: Normalized output (each entry has single git URL + array of files with merged content)
+- `FileContent`: Individual file with fileName and merged content
 
 **Pipeline Steps**:
 
-1. **Validation**: Check required fields, validate git URLs exist
+1. **Validation**: Check required fields (`files`, `repos`), validate file names (no path traversal)
 2. **Git Array Expansion**: `git: [url1, url2]` becomes two separate repo entries
-3. **Content Merge**: Per-repo `content` overlays onto root-level `content` using deep merge
+3. **Content Merge**: For each file, per-repo `content` overlays onto root-level file `content` using deep merge
 4. **Env Interpolation**: Replace `${VAR}` placeholders with environment values
+
+### Content Inheritance (3 levels)
+
+1. **Global file content** (`files[fileName].content`) - base for all repos
+2. **Per-repo overlay** (`repos[].files[fileName].content`) - merged with global
+3. **Per-repo override** (`repos[].files[fileName].override: true`) - replaces global entirely
+
+**File Exclusion**: Set `repos[].files[fileName]: false` to exclude a file from a specific repo.
 
 ### Deep Merge (merge.ts)
 
@@ -71,8 +80,8 @@ The tool processes repositories sequentially with a 9-step workflow per repo:
 1. Clean workspace (remove old clones)
 2. Clone repository
 3. Detect default branch (main/master)
-4. Create/checkout sync branch (`chore/sync-{sanitized-filename}`)
-5. Write config file (JSON or YAML based on filename extension)
+4. Create/checkout sync branch (`chore/sync-config` or custom `--branch`)
+5. Write all config files (JSON or YAML based on filename extension)
 6. Check for changes (skip if none)
 7. Commit changes
 8. Push to remote
@@ -97,13 +106,15 @@ Returns `RepoInfo` with normalized fields (owner, repo, organization, project) u
 
 **Shell Safety**: Uses `escapeShellArg()` to wrap all user-provided strings passed to `gh`/`az` CLI. Special handling: wraps in single quotes and escapes embedded single quotes as `'\''`.
 
-**Template System**: Loads PR body from `PR.md` file (included in npm package). Uses `{{FILE_NAME}}` and `{{ACTION}}` placeholders. Writes body to temp file to avoid shell escaping issues with multiline strings.
+**Template System**: Loads PR body from `PR.md` file (included in npm package). Uses `{{FILES}}` placeholders for file list. Writes body to temp file to avoid shell escaping issues with multiline strings.
+
+**PR Title**: Lists up to 3 files in title, or shows count for more files.
 
 ### Git Operations (git-ops.ts)
 
 **Branch Strategy**:
 
-- Sanitizes filename for branch name (removes extension, lowercase, alphanumeric+dashes only)
+- Default branch: `chore/sync-config` (or custom `--branch`)
 - Checks if branch exists on remote first (`git fetch origin <branch>`)
 - Reuses existing branch if found, otherwise creates new one
 - This allows updates to existing PRs instead of creating duplicates
@@ -119,31 +130,41 @@ Returns `RepoInfo` with normalized fields (owner, repo, organization, project) u
 
 ## Configuration Format
 
-YAML structure with inheritance:
+YAML structure with multi-file support:
 
 ```yaml
-fileName: my.config.json # Target file (.json → JSON, .yaml/.yml → YAML output)
-mergeStrategy: replace # Default array merge: replace | append | prepend
+files:
+  eslint.config.json:
+    mergeStrategy: append # Per-file array merge: replace | append | prepend
+    content:
+      extends: ["@company/base"]
 
-content: # Base config (inherited by all repos)
-  key: value
-  features:
-    - core
+  .prettierrc.yaml:
+    content:
+      singleQuote: true
 
 repos:
   - git: # Can be string or array of strings
       - git@github.com:org/repo1.git
       - git@github.com:org/repo2.git
-    content: # Overlay merged onto base content
-      key: override
-      features:
-        $arrayMerge: append # Use append for this array
-        values:
-          - custom
+    files: # Optional per-repo file overrides
+      eslint.config.json:
+        content: # Overlay merged onto base content
+          extends: ["plugin:react/recommended"]
+
   - git: git@github.com:org/repo3.git
-    override: true # Skip merging, use only this content
-    content:
-      different: config
+    # All files inherited as-is (no overrides)
+
+  - git: git@github.com:org/legacy.git
+    files:
+      eslint.config.json:
+        override: true # Skip merging, use only this content
+        content:
+          extends: ["eslint:recommended"]
+
+  - git: git@github.com:org/no-prettier.git
+    files:
+      .prettierrc.yaml: false # Exclude this file from this repo
 ```
 
 Output formatting: JSON uses 2-space indentation via `JSON.stringify()`. YAML uses 2-space indentation via the `yaml` package's `stringify()`. Trailing newline is always added.
@@ -210,7 +231,9 @@ The `release.yml` workflow automatically:
 
 **Unit Tests**: Modular test files per module:
 
-- `config.test.ts`: Config validation, normalization, integration
+- `config.test.ts`: Config validation, normalization, multi-file handling
+- `config-validator.test.ts`: Validation rules, file name security
+- `config-normalizer.test.ts`: Normalization pipeline, content merging
 - `merge.test.ts`: Deep merge logic, array strategies, directives
 - `env.test.ts`: Environment variable interpolation
 
@@ -229,13 +252,15 @@ Use fixtures in `fixtures/` directory.
 
 ```
 src/
-  index.ts          # CLI entry point, orchestration
-  config.ts         # Config loading, validation, normalization
-  merge.ts          # Deep merge with array strategies
-  env.ts            # Environment variable interpolation
-  git-ops.ts        # Git clone, branch, commit, push
-  repo-detector.ts  # GitHub/Azure URL parsing
-  pr-creator.ts     # PR creation via gh/az CLI
-  logger.ts         # Console output formatting
-  *.test.ts         # Unit tests per module
+  index.ts               # CLI entry point, orchestration
+  config.ts              # Config loading, types
+  config-validator.ts    # Config validation
+  config-normalizer.ts   # Config normalization pipeline
+  merge.ts               # Deep merge with array strategies
+  env.ts                 # Environment variable interpolation
+  git-ops.ts             # Git clone, branch, commit, push
+  repo-detector.ts       # GitHub/Azure URL parsing
+  pr-creator.ts          # PR creation via gh/az CLI
+  logger.ts              # Console output formatting
+  *.test.ts              # Unit tests per module
 ```

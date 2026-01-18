@@ -1,20 +1,22 @@
 # yaml-language-server: $schema=https://raw.githubusercontent.com/anthony-spruyt/json-config-sync/main/config-schema.json
-# Fixture testing global mergeStrategy: append
-fileName: global-merge.config.json
-mergeStrategy: append
-
-content:
-  features:
-    - base-feature-1
-    - base-feature-2
-  tags:
-    - tag1
+# Fixture testing per-file mergeStrategy: append
+files:
+  global-merge.config.json:
+    mergeStrategy: append
+    content:
+      features:
+        - base-feature-1
+        - base-feature-2
+      tags:
+        - tag1
 
 repos:
   - git: git@github.com:org/repo-global-append.git
-    content:
-      features:
-        - added-feature
-      tags:
-        - tag2
-        - tag3
+    files:
+      global-merge.config.json:
+        content:
+          features:
+            - added-feature
+          tags:
+            - tag2
+            - tag3

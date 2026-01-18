@@ -3,7 +3,12 @@ import assert from "node:assert";
 import { existsSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { escapeShellArg, formatPRBody } from "./pr-creator.js";
+import {
+  escapeShellArg,
+  formatPRBody,
+  formatPRTitle,
+  FileAction,
+} from "./pr-creator.js";
 
 describe("escapeShellArg", () => {
   test("wraps simple strings in single quotes", () => {
@@ -77,39 +82,81 @@ describe("escapeShellArg", () => {
 });
 
 describe("formatPRBody", () => {
-  test("replaces {{FILE_NAME}} placeholder", () => {
-    const result = formatPRBody("config.json", "create");
+  test("includes file name in body for single file", () => {
+    const files: FileAction[] = [{ fileName: "config.json", action: "create" }];
+    const result = formatPRBody(files);
     assert.ok(result.includes("config.json"));
-    assert.ok(!result.includes("{{FILE_NAME}}"));
   });
 
-  test('replaces {{ACTION}} placeholder with "Created" for create action', () => {
-    const result = formatPRBody("config.json", "create");
+  test('uses "Created" for create action', () => {
+    const files: FileAction[] = [{ fileName: "config.json", action: "create" }];
+    const result = formatPRBody(files);
     assert.ok(result.includes("Created"));
-    assert.ok(!result.includes("{{ACTION}}"));
   });
 
-  test('replaces {{ACTION}} placeholder with "Updated" for update action', () => {
-    const result = formatPRBody("config.json", "update");
+  test('uses "Updated" for update action', () => {
+    const files: FileAction[] = [{ fileName: "config.json", action: "update" }];
+    const result = formatPRBody(files);
     assert.ok(result.includes("Updated"));
-    assert.ok(!result.includes("{{ACTION}}"));
   });
 
   test("preserves markdown formatting", () => {
-    const result = formatPRBody("config.json", "create");
+    const files: FileAction[] = [{ fileName: "config.json", action: "create" }];
+    const result = formatPRBody(files);
     // Should contain markdown headers or formatting
-    assert.ok(result.includes("##") || result.includes("*"));
+    assert.ok(
+      result.includes("##") || result.includes("*") || result.includes("-"),
+    );
   });
 
-  test("handles multiple occurrences of placeholders", () => {
-    const result = formatPRBody("test.yaml", "update");
-    // Count occurrences of the file name
-    const fileNameOccurrences = (result.match(/test\.yaml/g) || []).length;
-    // Should replace all occurrences (at least 1)
-    assert.ok(fileNameOccurrences >= 1);
-    // Should not contain any unreplaced placeholders
-    assert.ok(!result.includes("{{"));
-    assert.ok(!result.includes("}}"));
+  test("handles multiple files", () => {
+    const files: FileAction[] = [
+      { fileName: "config.json", action: "create" },
+      { fileName: "settings.yaml", action: "update" },
+    ];
+    const result = formatPRBody(files);
+    assert.ok(result.includes("config.json"));
+    assert.ok(result.includes("settings.yaml"));
+    assert.ok(result.includes("Created"));
+    assert.ok(result.includes("Updated"));
+  });
+});
+
+describe("formatPRTitle", () => {
+  test("single file: includes file name", () => {
+    const files: FileAction[] = [{ fileName: "config.json", action: "create" }];
+    const result = formatPRTitle(files);
+    assert.strictEqual(result, "chore: sync config.json");
+  });
+
+  test("two files: lists both file names", () => {
+    const files: FileAction[] = [
+      { fileName: "config.json", action: "create" },
+      { fileName: "settings.yaml", action: "update" },
+    ];
+    const result = formatPRTitle(files);
+    assert.strictEqual(result, "chore: sync config.json, settings.yaml");
+  });
+
+  test("three files: lists all file names", () => {
+    const files: FileAction[] = [
+      { fileName: "a.json", action: "create" },
+      { fileName: "b.json", action: "update" },
+      { fileName: "c.json", action: "create" },
+    ];
+    const result = formatPRTitle(files);
+    assert.strictEqual(result, "chore: sync a.json, b.json, c.json");
+  });
+
+  test("more than 3 files: shows count", () => {
+    const files: FileAction[] = [
+      { fileName: "a.json", action: "create" },
+      { fileName: "b.json", action: "update" },
+      { fileName: "c.json", action: "create" },
+      { fileName: "d.json", action: "update" },
+    ];
+    const result = formatPRTitle(files);
+    assert.strictEqual(result, "chore: sync 4 config files");
   });
 });
 
@@ -127,7 +174,8 @@ describe("loadPRTemplate (via formatPRBody)", () => {
     );
 
     // formatPRBody should use content from PR.md
-    const result = formatPRBody("config.json", "create");
+    const files: FileAction[] = [{ fileName: "config.json", action: "create" }];
+    const result = formatPRBody(files);
 
     // The actual PR.md has specific content we can verify
     // It should contain markdown formatting from the template
@@ -135,7 +183,8 @@ describe("loadPRTemplate (via formatPRBody)", () => {
   });
 
   test("template contains expected sections", () => {
-    const result = formatPRBody("config.json", "create");
+    const files: FileAction[] = [{ fileName: "config.json", action: "create" }];
+    const result = formatPRBody(files);
 
     // PR.md should have summary section and automation note
     assert.ok(
@@ -149,7 +198,8 @@ describe("loadPRTemplate (via formatPRBody)", () => {
   test("fallback template structure is valid", () => {
     // The fallback template (in case PR.md is missing) has a specific structure
     // We verify by checking that formatPRBody always returns valid content
-    const result = formatPRBody("test.json", "create");
+    const files: FileAction[] = [{ fileName: "test.json", action: "create" }];
+    const result = formatPRBody(files);
 
     // Should have the filename
     assert.ok(result.includes("test.json"));

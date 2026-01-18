@@ -1,23 +1,28 @@
 # yaml-language-server: $schema=https://raw.githubusercontent.com/anthony-spruyt/json-config-sync/main/config-schema.json
-fileName: my.config.json
-content:
-  prop1: main
-  prop2:
-    prop3: MyService
-  prop4:
-    prop5:
-      - prop6: platform
-      - prop7: engineering
+files:
+  my.config.json:
+    content:
+      prop1: main
+      prop2:
+        prop3: MyService
+      prop4:
+        prop5:
+          - prop6: platform
+          - prop7: engineering
 repos:
   - git:
       - git@github.com:example-org/example-repo-1.git
       - git@github.com:example-org/example-repo-2.git
-    content:
-      prop4:
-        prop5:
-          - prop6: product
+    files:
+      my.config.json:
+        content:
+          prop4:
+            prop5:
+              - prop6: product
   - git: git@github.com:example-org/example-repo-3.git
-    content:
-      prop4:
-        prop5:
-          - prop6: data
+    files:
+      my.config.json:
+        content:
+          prop4:
+            prop5:
+              - prop6: data

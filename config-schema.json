@@ -4,22 +4,15 @@
   "title": "json-config-sync Configuration",
   "description": "Configuration file for json-config-sync CLI tool that syncs JSON/YAML config files across multiple Git repositories",
   "type": "object",
-  "required": ["fileName", "repos"],
+  "required": ["files", "repos"],
   "properties": {
-    "fileName": {
-      "type": "string",
-      "description": "Target filename. Extension determines output format: .json → JSON, .yaml/.yml → YAML"
-    },
-    "mergeStrategy": {
-      "type": "string",
-      "enum": ["replace", "append", "prepend"],
-      "default": "replace",
-      "description": "Default array merge strategy for all repos. 'replace' replaces arrays, 'append' adds overlay after base, 'prepend' adds overlay before base. Default: replace"
-    },
-    "content": {
+    "files": {
       "type": "object",
-      "description": "Base configuration inherited by all repos. Supports environment variables: ${VAR}, ${VAR:-default}, ${VAR:?message}",
-      "additionalProperties": true
+      "description": "Map of target filenames to their configurations. Each file is synced to all repos by default.",
+      "minProperties": 1,
+      "additionalProperties": {
+        "$ref": "#/definitions/fileConfig"
+      }
     },
     "repos": {
       "type": "array",
@@ -31,6 +24,24 @@
     }
   },
   "definitions": {
+    "fileConfig": {
+      "type": "object",
+      "description": "Configuration for a single file to sync",
+      "required": ["content"],
+      "properties": {
+        "content": {
+          "type": "object",
+          "description": "Base configuration content. Supports environment variables: ${VAR}, ${VAR:-default}, ${VAR:?message}",
+          "additionalProperties": true
+        },
+        "mergeStrategy": {
+          "type": "string",
+          "enum": ["replace", "append", "prepend"],
+          "default": "replace",
+          "description": "Array merge strategy for this file. 'replace' replaces arrays, 'append' adds overlay after base, 'prepend' adds overlay before base. Default: replace"
+        }
+      }
+    },
     "repo": {
       "type": "object",
       "description": "Repository configuration",
@@ -53,15 +64,37 @@
           ],
           "description": "Git repository URL(s). Supports GitHub (git@github.com:owner/repo.git, https://github.com/owner/repo.git) and Azure DevOps formats"
         },
+        "files": {
+          "type": "object",
+          "description": "Per-repo file overrides or exclusions. Keys must reference files defined in the root 'files' object. Set to false to exclude a file from this repo.",
+          "additionalProperties": {
+            "oneOf": [
+              {
+                "type": "boolean",
+                "const": false,
+                "description": "Set to false to exclude this file from this repo"
+              },
+              {
+                "$ref": "#/definitions/repoFileOverride"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "repoFileOverride": {
+      "type": "object",
+      "description": "Per-repo override for a specific file",
+      "properties": {
         "content": {
           "type": "object",
-          "description": "Per-repo content overlay merged onto base content. Use $arrayMerge directive to control array merging",
+          "description": "Content overlay merged onto the file's base content. Use $arrayMerge directive to control array merging.",
           "additionalProperties": true
         },
         "override": {
           "type": "boolean",
           "default": false,
-          "description": "If true, use only this repo's content and skip merging with base content. Default: false"
+          "description": "If true, use only this content and skip merging with base. Requires 'content' to be specified. Default: false"
         }
       }
     }
