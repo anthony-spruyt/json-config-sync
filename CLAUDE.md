@@ -37,6 +37,8 @@ Raw YAML → Parse → Validate → Expand git arrays → Deep merge per file �
 
 **File Exclusion**: Set `repos[].files[fileName]: false` to exclude a file from a specific repo.
 
+**Create-Only Mode**: Set `files[fileName].createOnly: true` to only create a file if it doesn't exist. Per-repo can override with `repos[].files[fileName].createOnly: false`.
+
 ### Deep Merge (merge.ts)
 
 Recursive object merging with configurable array handling:
@@ -142,6 +144,11 @@ files:
   .prettierrc.yaml:
     content:
       singleQuote: true
+
+  .trivyignore.yaml:
+    createOnly: true # Only create if file doesn't exist
+    content:
+      vulnerabilities: []
 
 repos:
   - git: # Can be string or array of strings

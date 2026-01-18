@@ -214,3 +214,85 @@ describe("loadPRTemplate (via formatPRBody)", () => {
     );
   });
 });
+
+describe("skip action handling", () => {
+  describe("formatPRBody with skip action", () => {
+    test("excludes skipped files from changes list", () => {
+      const files: FileAction[] = [
+        { fileName: "config.json", action: "create" },
+        { fileName: "skipped.json", action: "skip" },
+      ];
+      const result = formatPRBody(files);
+      assert.ok(result.includes("config.json"));
+      assert.ok(!result.includes("skipped.json"));
+    });
+
+    test("handles all files skipped gracefully", () => {
+      const files: FileAction[] = [
+        { fileName: "skipped.json", action: "skip" },
+      ];
+      const result = formatPRBody(files);
+      // Should still return valid markdown, even if empty changes
+      assert.ok(typeof result === "string");
+    });
+
+    test("mixed actions: only shows created/updated files", () => {
+      const files: FileAction[] = [
+        { fileName: "created.json", action: "create" },
+        { fileName: "updated.json", action: "update" },
+        { fileName: "skipped.json", action: "skip" },
+      ];
+      const result = formatPRBody(files);
+      assert.ok(result.includes("Created"));
+      assert.ok(result.includes("Updated"));
+      assert.ok(result.includes("created.json"));
+      assert.ok(result.includes("updated.json"));
+      assert.ok(!result.includes("skipped.json"));
+    });
+  });
+
+  describe("formatPRTitle with skip action", () => {
+    test("excludes skipped files from title - single file remaining", () => {
+      const files: FileAction[] = [
+        { fileName: "config.json", action: "create" },
+        { fileName: "skipped.json", action: "skip" },
+      ];
+      const result = formatPRTitle(files);
+      assert.strictEqual(result, "chore: sync config.json");
+    });
+
+    test("excludes skipped files from title - multiple files remaining", () => {
+      const files: FileAction[] = [
+        { fileName: "a.json", action: "create" },
+        { fileName: "b.json", action: "update" },
+        { fileName: "skipped.json", action: "skip" },
+      ];
+      const result = formatPRTitle(files);
+      assert.strictEqual(result, "chore: sync a.json, b.json");
+    });
+
+    test("excludes skipped files from count", () => {
+      const files: FileAction[] = [
+        { fileName: "a.json", action: "create" },
+        { fileName: "b.json", action: "update" },
+        { fileName: "c.json", action: "create" },
+        { fileName: "d.json", action: "update" },
+        { fileName: "skipped1.json", action: "skip" },
+        { fileName: "skipped2.json", action: "skip" },
+      ];
+      const result = formatPRTitle(files);
+      // 4 actual changes, 2 skipped - title should show 4
+      assert.strictEqual(result, "chore: sync 4 config files");
+    });
+
+    test("handles all files skipped", () => {
+      const files: FileAction[] = [
+        { fileName: "a.json", action: "skip" },
+        { fileName: "b.json", action: "skip" },
+      ];
+      const result = formatPRTitle(files);
+      // Edge case: no actual changes - should handle gracefully
+      assert.ok(typeof result === "string");
+    });
+  });
+});

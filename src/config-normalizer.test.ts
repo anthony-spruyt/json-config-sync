@@ -473,4 +473,129 @@ describe("normalizeConfig", () => {
       assert.deepEqual(replaceFile?.content.items, ["y"]);
     });
   });
+
+  describe("createOnly propagation", () => {
+    test("passes root-level createOnly: true to FileContent", () => {
+      const raw: RawConfig = {
+        files: {
+          "config.json": { content: { key: "value" }, createOnly: true },
+        },
+        repos: [{ git: "git@github.com:org/repo.git" }],
+      };
+
+      const result = normalizeConfig(raw);
+      assert.equal(result.repos[0].files[0].createOnly, true);
+    });
+
+    test("passes root-level createOnly: false to FileContent", () => {
+      const raw: RawConfig = {
+        files: {
+          "config.json": { content: { key: "value" }, createOnly: false },
+        },
+        repos: [{ git: "git@github.com:org/repo.git" }],
+      };
+
+      const result = normalizeConfig(raw);
+      assert.equal(result.repos[0].files[0].createOnly, false);
+    });
+
+    test("createOnly is undefined when not specified", () => {
+      const raw: RawConfig = {
+        files: {
+          "config.json": { content: { key: "value" } },
+        },
+        repos: [{ git: "git@github.com:org/repo.git" }],
+      };
+
+      const result = normalizeConfig(raw);
+      assert.equal(result.repos[0].files[0].createOnly, undefined);
+    });
+
+    test("per-repo createOnly overrides root-level", () => {
+      const raw: RawConfig = {
+        files: {
+          "config.json": { content: { key: "value" }, createOnly: true },
+        },
+        repos: [
+          {
+            git: "git@github.com:org/repo.git",
+            files: {
+              "config.json": { createOnly: false },
+            },
+          },
+        ],
+      };
+
+      const result = normalizeConfig(raw);
+      assert.equal(result.repos[0].files[0].createOnly, false);
+    });
+
+    test("per-repo createOnly: true overrides undefined root", () => {
+      const raw: RawConfig = {
+        files: {
+          "config.json": { content: { key: "value" } },
+        },
+        repos: [
+          {
+            git: "git@github.com:org/repo.git",
+            files: {
+              "config.json": { createOnly: true },
+            },
+          },
+        ],
+      };
+
+      const result = normalizeConfig(raw);
+      assert.equal(result.repos[0].files[0].createOnly, true);
+    });
+
+    test("different repos can have different createOnly values", () => {
+      const raw: RawConfig = {
+        files: {
+          "config.json": { content: { key: "value" }, createOnly: true },
+        },
+        repos: [
+          { git: "git@github.com:org/repo1.git" },
+          {
+            git: "git@github.com:org/repo2.git",
+            files: {
+              "config.json": { createOnly: false },
+            },
+          },
+        ],
+      };
+
+      const result = normalizeConfig(raw);
+      // repo1 inherits root createOnly: true
+      assert.equal(result.repos[0].files[0].createOnly, true);
+      // repo2 overrides to false
+      assert.equal(result.repos[1].files[0].createOnly, false);
+    });
+
+    test("createOnly works with override mode", () => {
+      const raw: RawConfig = {
+        files: {
+          "config.json": { content: { base: "value" } },
+        },
+        repos: [
+          {
+            git: "git@github.com:org/repo.git",
+            files: {
+              "config.json": {
+                createOnly: true,
+                override: true,
+                content: { only: "repo-value" },
+              },
+            },
+          },
+        ],
+      };
+
+      const result = normalizeConfig(raw);
+      assert.equal(result.repos[0].files[0].createOnly, true);
+      assert.deepEqual(result.repos[0].files[0].content, {
+        only: "repo-value",
+      });
+    });
+  });
 });

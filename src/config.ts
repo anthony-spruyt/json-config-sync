@@ -15,12 +15,14 @@ export { convertContentToString } from "./config-formatter.js";
 export interface RawFileConfig {
   content: Record<string, unknown>;
   mergeStrategy?: ArrayMergeStrategy;
+  createOnly?: boolean;
 }
 
 // Per-repo file override
 export interface RawRepoFileOverride {
   content?: Record<string, unknown>;
   override?: boolean;
+  createOnly?: boolean;
 }
 
 // Repo configuration
@@ -44,6 +46,7 @@ export interface RawConfig {
 export interface FileContent {
   fileName: string;
   content: Record<string, unknown>;
+  createOnly?: boolean;
 }
 
 // Normalized repo config with all files to sync

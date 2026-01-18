@@ -77,14 +77,23 @@ export class RepositoryProcessor {
       const changedFiles: FileAction[] = [];
 
       for (const file of repoConfig.files) {
+        const filePath = join(workDir, file.fileName);
+        const fileExists = existsSync(filePath);
+
+        // Handle createOnly - skip if file already exists
+        if (file.createOnly && fileExists) {
+          this.log.info(
+            `Skipping ${file.fileName} (createOnly: already exists)`,
+          );
+          changedFiles.push({ fileName: file.fileName, action: "skip" });
+          continue;
+        }
+
         this.log.info(`Writing ${file.fileName}...`);
         const fileContent = convertContentToString(file.content, file.fileName);
-        const filePath = join(workDir, file.fileName);
 
         // Determine action type (create vs update)
-        const action: "create" | "update" = existsSync(filePath)
-          ? "update"
-          : "create";
+        const action: "create" | "update" = fileExists ? "update" : "create";
 
         if (dryRun) {
           // In dry-run, check if file would change without writing
@@ -97,22 +106,26 @@ export class RepositoryProcessor {
         }
       }
 
-      // Step 6: Check for changes
+      // Step 6: Check for changes (exclude skipped files)
       let hasChanges: boolean;
       if (dryRun) {
-        hasChanges = changedFiles.length > 0;
+        hasChanges = changedFiles.filter((f) => f.action !== "skip").length > 0;
       } else {
         hasChanges = await this.gitOps.hasChanges();
         // If there are changes, determine which files changed
         if (hasChanges) {
           // Rebuild the changed files list by checking git status
-          // For simplicity, we include all files with their detected actions
+          // Skip files that were already marked as skipped (createOnly)
+          const skippedFiles = new Set(
+            changedFiles
+              .filter((f) => f.action === "skip")
+              .map((f) => f.fileName),
+          );
           for (const file of repoConfig.files) {
+            if (skippedFiles.has(file.fileName)) {
+              continue; // Already tracked as skipped
+            }
             const filePath = join(workDir, file.fileName);
-            // We check if file existed before writing (action was determined above)
-            // Since we don't have pre-write state, we'll mark all files that are in the commit
-            // A more accurate approach would track this before writing, but for now
-            // we'll assume all files are being synced and include them all
             const action: "create" | "update" = existsSync(filePath)
               ? "update"
               : "create";
@@ -170,18 +183,20 @@ export class RepositoryProcessor {
   }
 
   /**
-   * Format commit message based on files changed
+   * Format commit message based on files changed (excludes skipped files)
    */
   private formatCommitMessage(files: FileAction[]): string {
-    if (files.length === 1) {
-      return `chore: sync ${files[0].fileName}`;
+    const changedFiles = files.filter((f) => f.action !== "skip");
+
+    if (changedFiles.length === 1) {
+      return `chore: sync ${changedFiles[0].fileName}`;
     }
 
-    if (files.length <= 3) {
-      const fileNames = files.map((f) => f.fileName).join(", ");
+    if (changedFiles.length <= 3) {
+      const fileNames = changedFiles.map((f) => f.fileName).join(", ");
       return `chore: sync ${fileNames}`;
     }
 
-    return `chore: sync ${files.length} config files`;
+    return `chore: sync ${changedFiles.length} config files`;
   }
 }

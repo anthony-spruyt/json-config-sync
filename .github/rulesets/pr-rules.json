@@ -2,13 +2,7 @@
   "name": "pr-rules",
   "target": "branch",
   "enforcement": "active",
-  "bypass_actors": [
-    {
-      "actor_id": 5,
-      "actor_type": "RepositoryRole",
-      "bypass_mode": "always"
-    }
-  ],
+  "bypass_actors": [],
   "conditions": {
     "ref_name": {
       "include": ["refs/heads/main"],

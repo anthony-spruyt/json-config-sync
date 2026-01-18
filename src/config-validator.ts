@@ -43,6 +43,13 @@ export function validateRawConfig(config: RawConfig): void {
         `File '${fileName}' has invalid mergeStrategy: ${fileConfig.mergeStrategy}. Must be one of: ${VALID_STRATEGIES.join(", ")}`,
       );
     }
+
+    if (
+      fileConfig.createOnly !== undefined &&
+      typeof fileConfig.createOnly !== "boolean"
+    ) {
+      throw new Error(`File '${fileName}' createOnly must be a boolean`);
+    }
   }
 
   if (!config.repos || !Array.isArray(config.repos)) {
@@ -94,6 +101,15 @@ export function validateRawConfig(config: RawConfig): void {
         ) {
           throw new Error(
             `Repo at index ${i}: file '${fileName}' content must be an object`,
+          );
+        }
+
+        if (
+          fileOverride.createOnly !== undefined &&
+          typeof fileOverride.createOnly !== "boolean"
+        ) {
+          throw new Error(
+            `Repo ${getGitDisplayName(repo.git)}: file '${fileName}' createOnly must be a boolean`,
           );
         }
       }
