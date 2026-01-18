@@ -39,6 +39,11 @@
           "enum": ["replace", "append", "prepend"],
           "default": "replace",
           "description": "Array merge strategy for this file. 'replace' replaces arrays, 'append' adds overlay after base, 'prepend' adds overlay before base. Default: replace"
+        },
+        "createOnly": {
+          "type": "boolean",
+          "default": false,
+          "description": "If true, only create this file if it doesn't already exist in the target repo. Useful for files like .trivyignore or .prettierignore where you want to provide defaults but let repos customize. Default: false"
         }
       }
     },
@@ -95,6 +100,10 @@
           "type": "boolean",
           "default": false,
           "description": "If true, use only this content and skip merging with base. Requires 'content' to be specified. Default: false"
+        },
+        "createOnly": {
+          "type": "boolean",
+          "description": "Override the root-level createOnly setting for this specific repo"
         }
       }
     }

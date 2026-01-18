@@ -317,6 +317,98 @@ describe("validateRawConfig", () => {
     });
   });
 
+  describe("createOnly validation", () => {
+    test("allows createOnly: true at root file level", () => {
+      const config = createValidConfig({
+        files: { "config.json": { content: {}, createOnly: true } },
+      });
+      assert.doesNotThrow(() => validateRawConfig(config));
+    });
+
+    test("allows createOnly: false at root file level", () => {
+      const config = createValidConfig({
+        files: { "config.json": { content: {}, createOnly: false } },
+      });
+      assert.doesNotThrow(() => validateRawConfig(config));
+    });
+
+    test("allows undefined createOnly at root file level", () => {
+      const config = createValidConfig({
+        files: { "config.json": { content: {} } },
+      });
+      assert.doesNotThrow(() => validateRawConfig(config));
+    });
+
+    test("throws when createOnly is not a boolean at root level", () => {
+      const config = createValidConfig({
+        files: {
+          "config.json": { content: {}, createOnly: "yes" as never },
+        },
+      });
+      assert.throws(
+        () => validateRawConfig(config),
+        /createOnly must be a boolean/,
+      );
+    });
+
+    test("allows createOnly: true at per-repo level", () => {
+      const config = createValidConfig({
+        repos: [
+          {
+            git: "git@github.com:org/repo.git",
+            files: { "config.json": { createOnly: true } },
+          },
+        ],
+      });
+      assert.doesNotThrow(() => validateRawConfig(config));
+    });
+
+    test("allows createOnly: false at per-repo level", () => {
+      const config = createValidConfig({
+        repos: [
+          {
+            git: "git@github.com:org/repo.git",
+            files: { "config.json": { createOnly: false } },
+          },
+        ],
+      });
+      assert.doesNotThrow(() => validateRawConfig(config));
+    });
+
+    test("throws when createOnly is not a boolean at per-repo level", () => {
+      const config = createValidConfig({
+        repos: [
+          {
+            git: "git@github.com:org/repo.git",
+            files: { "config.json": { createOnly: 123 as never } },
+          },
+        ],
+      });
+      assert.throws(
+        () => validateRawConfig(config),
+        /createOnly must be a boolean/,
+      );
+    });
+
+    test("allows createOnly with content and override", () => {
+      const config = createValidConfig({
+        repos: [
+          {
+            git: "git@github.com:org/repo.git",
+            files: {
+              "config.json": {
+                createOnly: true,
+                override: true,
+                content: { key: "value" },
+              },
+            },
+          },
+        ],
+      });
+      assert.doesNotThrow(() => validateRawConfig(config));
+    });
+  });
+
   describe("valid configurations", () => {
     test("accepts minimal valid config", () => {
       const config: RawConfig = {

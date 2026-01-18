@@ -169,6 +169,7 @@ repos: # List of repositories
 | --------------- | ---------------------------------------------------- | -------- |
 | `content`       | Base config inherited by all repos                   | Yes      |
 | `mergeStrategy` | Array merge strategy: `replace`, `append`, `prepend` | No       |
+| `createOnly`    | If `true`, only create file if it doesn't exist      | No       |
 
 ### Per-Repo Fields
 
@@ -179,10 +180,11 @@ repos: # List of repositories
 
 ### Per-Repo File Override Fields
 
-| Field      | Description                                             | Required |
-| ---------- | ------------------------------------------------------- | -------- |
-| `content`  | Content overlay merged onto file's base content         | No       |
-| `override` | If `true`, ignore base content and use only this repo's | No       |
+| Field        | Description                                             | Required |
+| ------------ | ------------------------------------------------------- | -------- |
+| `content`    | Content overlay merged onto file's base content         | No       |
+| `override`   | If `true`, ignore base content and use only this repo's | No       |
+| `createOnly` | Override root-level `createOnly` for this repo          | No       |
 
 **File Exclusion:** Set a file to `false` to exclude it from a specific repo:
 
@@ -361,6 +363,39 @@ repos:
         content:
           extends: ["plugin:react/recommended"]
       # Results in extends: ["@company/base", "plugin:react/recommended"]
+```
+
+### Create-Only Files (Defaults That Can Be Customized)
+
+Some files should only be created once as defaults, allowing repos to maintain their own versions:
+
+```yaml
+files:
+  .trivyignore.yaml:
+    createOnly: true # Only create if doesn't exist
+    content:
+      vulnerabilities: []
+
+  .prettierignore:
+    createOnly: true
+    content:
+      patterns:
+        - "dist/"
+        - "node_modules/"
+
+  eslint.config.json:
+    content: # Always synced (no createOnly)
+      extends: ["@company/base"]
+
+repos:
+  - git: git@github.com:org/repo.git
+    # .trivyignore.yaml and .prettierignore only created if missing
+    # eslint.config.json always updated
+
+  - git: git@github.com:org/special-repo.git
+    files:
+      .trivyignore.yaml:
+        createOnly: false # Override: always sync this file
 ```
 
 ## Supported Git URL Formats

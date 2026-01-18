@@ -59,9 +59,13 @@ export function normalizeConfig(raw: RawConfig): Config {
         // Step 4: Interpolate env vars
         mergedContent = interpolateEnvVars(mergedContent, { strict: true });
 
+        // Resolve createOnly: per-repo overrides root level
+        const createOnly = repoOverride?.createOnly ?? fileConfig.createOnly;
+
         files.push({
           fileName,
           content: mergedContent,
+          createOnly,
         });
       }
 
